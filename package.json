@@ -1,0 +1,25 @@
+{
+  "name": "trillion-be",
+  "version": "1.0.0",
+  "description": "종합프로젝트 1조 BE Repository입니다.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ureca3rd-FE/Trillion-BE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Ureca3rd-FE/Trillion-BE/issues"
+  },
+  "homepage": "https://github.com/Ureca3rd-FE/Trillion-BE#readme",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
