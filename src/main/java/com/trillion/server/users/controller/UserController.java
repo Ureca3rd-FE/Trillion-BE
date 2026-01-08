@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trillion.server.users.domain.UserEntity;
+import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.users.service.UserService;
 
