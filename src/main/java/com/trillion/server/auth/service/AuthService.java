@@ -9,9 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.trillion.server.common.util.JwtUtil;
-import com.trillion.server.users.domain.UserEntity;
-import com.trillion.server.users.domain.UserEntity.UserRole;
-import com.trillion.server.users.domain.UserEntity.UserStatus;
+import com.trillion.server.users.entity.UserEntity;
+import com.trillion.server.users.entity.UserEntity.UserRole;
+import com.trillion.server.users.entity.UserEntity.UserStatus;
 import com.trillion.server.users.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
