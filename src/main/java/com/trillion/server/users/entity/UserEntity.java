@@ -1,4 +1,4 @@
-package com.trillion.server.users.domain;
+package com.trillion.server.users.entity;
 
 import java.time.LocalDateTime;
 
