@@ -1,4 +1,4 @@
-package com.trillion.server.config;
+package com.trillion.server.common.config;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
