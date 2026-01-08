@@ -11,7 +11,7 @@ class TrillionApplicationTests {
 	}
     // test용 코드
     @Test
-    void contextLoading() {
+    void contextLoadings() {
     }
 
 }
