@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trillion.server.auth.domain.User;
+import com.trillion.server.users.domain.UserEntity;
 import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.users.service.UserService;
 
@@ -73,7 +73,7 @@ public class UserController {
         }
         
         Long userId = jwtUtil.extractUserId(accessToken);
-        User user = userService.getCurrentUser(userId);
+        UserEntity user = userService.getCurrentUser(userId);
         
         Map<String, Object> result = new HashMap<>();
         result.put("userId", user.getId());

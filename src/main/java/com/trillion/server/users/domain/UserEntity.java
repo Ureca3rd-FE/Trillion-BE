@@ -1,4 +1,4 @@
-package com.trillion.server.auth.domain;
+package com.trillion.server.users.domain;
 
 import java.time.LocalDateTime;
 
@@ -25,7 +25,7 @@ import lombok.NoArgsConstructor;
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User {
+public class UserEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,7 +61,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     @Builder
-    public User(String kakaoId, String nickname, String profileImageUrl, 
+    public UserEntity(String kakaoId, String nickname, String profileImageUrl, 
                 String thumbnailImageUrl, UserRole role, UserStatus status) {
         this.kakaoId = kakaoId;
         this.nickname = nickname;

@@ -8,11 +8,11 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.trillion.server.auth.domain.User;
-import com.trillion.server.auth.domain.User.UserRole;
-import com.trillion.server.auth.domain.User.UserStatus;
-import com.trillion.server.auth.repository.UserRepository;
 import com.trillion.server.common.util.JwtUtil;
+import com.trillion.server.users.domain.UserEntity;
+import com.trillion.server.users.domain.UserEntity.UserRole;
+import com.trillion.server.users.domain.UserEntity.UserStatus;
+import com.trillion.server.users.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -49,15 +49,15 @@ public class AuthService {
             }
         }
         
-        Optional<User> existingUser = userRepository.findByKakaoId(kakaoId);
-        User user;
+        Optional<UserEntity> existingUser = userRepository.findByKakaoId(kakaoId);
+        UserEntity user;
         
         if (existingUser.isPresent()) {
             user = existingUser.get();
             user.updateProfile(nickname, profileImageUrl, thumbnailImageUrl);
             user.updateLastLoginAt();
         } else {
-            user = User.builder()
+            user = UserEntity.builder()
                     .kakaoId(kakaoId)
                     .nickname(nickname)
                     .profileImageUrl(profileImageUrl)
@@ -95,7 +95,7 @@ public class AuthService {
             throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
         }
         
-        User user = userRepository.findById(userId)
+        UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
         
         Long userIdValue = user.getId();
