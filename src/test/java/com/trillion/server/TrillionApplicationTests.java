@@ -9,5 +9,9 @@ class TrillionApplicationTests {
 	@Test
 	void contextLoads() {
 	}
+    // test용 코드
+    @Test
+    void contextLoadings() {
+    }
 
 }
