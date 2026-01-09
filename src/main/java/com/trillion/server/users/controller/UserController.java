@@ -1,0 +1,109 @@
+package com.trillion.server.users.controller;
+
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.trillion.server.common.exception.SuccessResponse;
+import com.trillion.server.users.dto.UserResponse;
+import com.trillion.server.users.entity.UserEntity;
+import com.trillion.server.users.service.UserService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/users")
+@RequiredArgsConstructor
+@Tag(name = "사용자", description = "사용자 정보 관리 API")
+public class UserController {
+
+    private final UserService userService;
+
+    @Operation(summary = "내 정보 조회", description = "현재 로그인한 사용자의 정보를 조회합니다.")
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "조회 성공",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    value = """
+                        {
+                          "success": true,
+                          "data": {
+                            "userId": 1,
+                            "kakaoId": "123456789",
+                            "nickname": "홍길동",
+                            "profileImageUrl": "https://k.kakaocdn.net/dn/example/profile.jpg",
+                            "thumbnailImageUrl": "https://k.kakaocdn.net/dn/example/thumb.jpg",
+                            "role": "USER",
+                            "status": "ACTIVE",
+                            "lastLoginAt": "2024-01-08T10:30:00",
+                            "createdAt": "2024-01-01T00:00:00",
+                            "updatedAt": "2024-01-08T10:30:00"
+                          }
+                        }
+                        """
+                )
+            )
+        ),
+        @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자"),
+        @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
+    })
+    @GetMapping("/me")
+    public ResponseEntity<SuccessResponse<UserResponse>> getCurrentUser(
+            @AuthenticationPrincipal Long userId) {
+        
+        UserEntity user = userService.getCurrentUser(userId);
+        
+        UserResponse userResponse = UserResponse.builder()
+                .userId(user.getId())
+                .kakaoId(user.getKakaoId())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .thumbnailImageUrl(user.getThumbnailImageUrl())
+                .role(user.getRole().name())
+                .status(user.getStatus().name())
+                .lastLoginAt(user.getLastLoginAt())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+        
+        return ResponseEntity.ok(SuccessResponse.of(userResponse));
+    }
+
+    @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 탈퇴 처리합니다.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "회원 탈퇴 성공"),
+        @ApiResponse(responseCode = "400", description = "유효하지 않은 토큰 또는 이미 탈퇴한 사용자"),
+        @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
+    })
+    @DeleteMapping("/me")
+    public ResponseEntity<SuccessResponse<Void>> deleteAccount(
+            @AuthenticationPrincipal Long userId,
+            HttpServletResponse response) {
+        
+        userService.deleteAccount(userId);
+        
+        deleteTokenCookies(response);
+        
+        return ResponseEntity.ok(SuccessResponse.of("회원 탈퇴가 완료되었습니다."));
+    }
+    
+    private void deleteTokenCookies(HttpServletResponse response) {
+        response.addHeader("Set-Cookie", "accessToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
+        response.addHeader("Set-Cookie", "refreshToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
+        response.addHeader("Set-Cookie", "isSignin=; Path=/; Max-Age=0; SameSite=Lax");
+    }
+}
