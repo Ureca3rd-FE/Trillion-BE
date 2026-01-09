@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
         });
         
         response.put("success", false);
-        response.put("message", "입력값 검증에 실패했습니다.");
+        response.put("message", ErrorMessages.VALIDATION_FAILED);
         response.put("errors", errors);
         response.put("error", "VALIDATION_ERROR");
         return ResponseEntity.badRequest().body(response);
@@ -57,7 +57,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception e) {
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
-        response.put("message", "서버 오류가 발생했습니다.");
+        response.put("message", ErrorMessages.INTERNAL_SERVER_ERROR);
         response.put("error", "INTERNAL_SERVER_ERROR");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }

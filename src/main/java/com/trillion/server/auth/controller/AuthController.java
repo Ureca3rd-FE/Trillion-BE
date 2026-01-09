@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trillion.server.auth.service.AuthService;
+import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.exception.SuccessResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,7 +36,7 @@ public class AuthController {
     public ResponseEntity<SuccessResponse<Map<String, Object>>> refreshToken(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
         if (refreshToken == null || refreshToken.isEmpty()) {
-            throw new IllegalArgumentException("리프레시 토큰이 필요합니다.");
+            throw new IllegalArgumentException(ErrorMessages.REFRESH_TOKEN_REQUIRED);
         }
         
         Map<String, Object> tokenData = authService.refreshTokens(refreshToken);
@@ -56,5 +57,7 @@ public class AuthController {
     private void deleteTokenCookies(HttpServletResponse response) {
         response.addHeader("Set-Cookie", "accessToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
         response.addHeader("Set-Cookie", "refreshToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
+        response.addHeader("Set-Cookie", "isNewUser=; Path=/; Max-Age=0; SameSite=Lax");
+        response.addHeader("Set-Cookie", "isSignin=; Path=/; Max-Age=0; SameSite=Lax");
     }
 }

@@ -23,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trillion.server.auth.service.AuthService;
+import com.trillion.server.common.exception.ErrorMessages;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -78,6 +79,7 @@ public class SecurityConfig {
             
             String accessToken = (String) result.get("accessToken");
             String refreshToken = (String) result.get("refreshToken");
+            Boolean isNewUser = (Boolean) result.get("isNewUser");
             
             int accessTokenMaxAge = (int) (accessTokenExpiration / 1000);
             int refreshTokenMaxAge = (int) (refreshTokenExpiration / 1000);
@@ -85,21 +87,17 @@ public class SecurityConfig {
             addTokenCookie(response, "accessToken", accessToken, accessTokenMaxAge);
             addTokenCookie(response, "refreshToken", refreshToken, refreshTokenMaxAge);
             
+            boolean isNewUserValue = isNewUser != null && isNewUser;
+            boolean isSigninValue = !isNewUserValue;
+            addPublicCookie(response, "isNewUser", String.valueOf(isNewUserValue), 60);   
+            addPublicCookie(response, "isSignin", String.valueOf(isSigninValue), accessTokenMaxAge); 
+            
             String redirectUri = getRedirectUriFromCookie(request);
             
             if (redirectUri != null && !redirectUri.isBlank()) {
-                String redirectUrl = redirectUri + "?success=true";
-                response.sendRedirect(redirectUrl);
+                response.sendRedirect(redirectUri);
             } else {
-                Map<String, Object> responseBody = new HashMap<>();
-                responseBody.put("success", true);
-                responseBody.put("message", "로그인 성공");
-                responseBody.putAll(result);
-
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                response.setCharacterEncoding("UTF-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                objectMapper.writeValue(response.getWriter(), responseBody);
+                response.sendRedirect("/");
             }
         };
     }
@@ -115,7 +113,7 @@ public class SecurityConfig {
             if (redirectUri != null && !redirectUri.isBlank()) {
                 String redirectUrl = redirectUri + 
                     "?success=false" +
-                    "&message=" + java.net.URLEncoder.encode("로그인에 실패했습니다.", java.nio.charset.StandardCharsets.UTF_8);
+                    "&message=" + java.net.URLEncoder.encode(ErrorMessages.LOGIN_FAILED, java.nio.charset.StandardCharsets.UTF_8);
                 
                 if (error != null) {
                     redirectUrl += "&error=" + java.net.URLEncoder.encode(error, java.nio.charset.StandardCharsets.UTF_8);
@@ -153,10 +151,16 @@ public class SecurityConfig {
         response.addHeader("Set-Cookie", cookieValue);
     }
     
+    private void addPublicCookie(HttpServletResponse response, String name, String value, int maxAge) {
+        String cookieValue = String.format("%s=%s; Path=/; Max-Age=%d; SameSite=Lax", 
+            name, value, maxAge);
+        response.addHeader("Set-Cookie", cookieValue);
+    }
+    
     private void sendFailureJsonResponse(HttpServletResponse response, String error, String errorDescription) {
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", false);
-        responseBody.put("message", "로그인에 실패했습니다.");
+        responseBody.put("message", ErrorMessages.LOGIN_FAILED);
         if (error != null) {
             responseBody.put("error", error);
         }

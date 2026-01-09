@@ -1,0 +1,23 @@
+package com.trillion.server.common.exception;
+
+public final class ErrorMessages {
+    
+    private ErrorMessages() {
+        throw new UnsupportedOperationException("Utility class");
+    }
+    
+    public static final String AUTH_TOKEN_REQUIRED = "인증 토큰이 필요합니다.";
+    public static final String INVALID_TOKEN = "유효하지 않은 토큰입니다.";
+    public static final String INVALID_REFRESH_TOKEN = "유효하지 않은 리프레시 토큰입니다.";
+    public static final String REFRESH_TOKEN_REQUIRED = "리프레시 토큰이 필요합니다.";
+    
+    public static final String USER_ID_REQUIRED = "사용자 ID가 필요합니다.";
+    public static final String USER_NOT_FOUND = "사용자를 찾을 수 없습니다.";
+    public static final String USER_ALREADY_DELETED = "이미 탈퇴한 사용자입니다.";
+    
+    public static final String VALIDATION_FAILED = "입력값 검증에 실패했습니다.";
+    public static final String INTERNAL_SERVER_ERROR = "서버 오류가 발생했습니다.";
+    public static final String LOGIN_FAILED = "로그인에 실패했습니다.";
+    
+    public static final String INVALID_TOKEN_WITH_DETAIL = "유효하지 않은 토큰입니다: %s";
+}

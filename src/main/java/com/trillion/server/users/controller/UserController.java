@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.exception.SuccessResponse;
 import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.users.entity.UserEntity;
@@ -69,11 +70,11 @@ public class UserController {
             @CookieValue(value = "accessToken", required = false) String accessToken) {
         
         if (accessToken == null || accessToken.isEmpty()) {
-            throw new IllegalArgumentException("인증 토큰이 필요합니다.");
+            throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
         }
         
         if (!jwtUtil.validateToken(accessToken, "ACCESS")) {
-            throw new IllegalArgumentException("유효하지 않은 토큰입니다.");
+            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
         }
         
         Long userId = jwtUtil.extractUserId(accessToken);
@@ -106,11 +107,11 @@ public class UserController {
             HttpServletResponse response) {
         
         if (accessToken == null || accessToken.isEmpty()) {
-            throw new IllegalArgumentException("인증 토큰이 필요합니다.");
+            throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
         }
         
         if (!jwtUtil.validateToken(accessToken, "ACCESS")) {
-            throw new IllegalArgumentException("유효하지 않은 토큰입니다.");
+            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
         }
         
         Long userId = jwtUtil.extractUserId(accessToken);
@@ -122,7 +123,11 @@ public class UserController {
     }
     
     private void deleteTokenCookies(HttpServletResponse response) {
+        // 토큰 쿠키 삭제
         response.addHeader("Set-Cookie", "accessToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
         response.addHeader("Set-Cookie", "refreshToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
+        // 상태 쿠키 삭제
+        response.addHeader("Set-Cookie", "isNewUser=; Path=/; Max-Age=0; SameSite=Lax");
+        response.addHeader("Set-Cookie", "isSignin=; Path=/; Max-Age=0; SameSite=Lax");
     }
 }

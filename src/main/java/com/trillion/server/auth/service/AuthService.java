@@ -8,6 +8,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.entity.UserEntity.UserRole;
@@ -51,6 +52,7 @@ public class AuthService {
         
         Optional<UserEntity> existingUser = userRepository.findByKakaoId(kakaoId);
         UserEntity user;
+        boolean isNewUser = false;
         
         if (existingUser.isPresent()) {
             user = existingUser.get();
@@ -65,6 +67,7 @@ public class AuthService {
                     .role(UserRole.USER)
                     .status(UserStatus.ACTIVE)
                     .build();
+            isNewUser = true;
         }
         
         userRepository.save(user);
@@ -79,6 +82,7 @@ public class AuthService {
         result.put("profileImageUrl", user.getProfileImageUrl());
         result.put("thumbnailImageUrl", user.getThumbnailImageUrl());
         result.put("role", user.getRole().name());
+        result.put("isNewUser", isNewUser);
         result.put("accessToken", accessToken);
         result.put("refreshToken", refreshToken);
         
@@ -87,16 +91,16 @@ public class AuthService {
 
     public Map<String, Object> refreshTokens(String refreshToken) {
         if (!jwtUtil.validateToken(refreshToken, "REFRESH")) {
-            throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
+            throw new IllegalArgumentException(ErrorMessages.INVALID_REFRESH_TOKEN);
         }
         
         Long userId = jwtUtil.extractUserId(refreshToken);
         if (userId == null) {
-            throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
+            throw new IllegalArgumentException(ErrorMessages.INVALID_REFRESH_TOKEN);
         }
         
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
         
         Long userIdValue = user.getId();
         String newAccessToken = jwtUtil.generateAccessToken(userIdValue, user.getRole().name());

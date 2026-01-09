@@ -9,6 +9,8 @@ import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.trillion.server.common.exception.ErrorMessages;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -66,7 +68,7 @@ public class JwtUtil {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (Exception e) {
-            throw new IllegalArgumentException("유효하지 않은 토큰입니다: " + e.getMessage());
+            throw new IllegalArgumentException(String.format(ErrorMessages.INVALID_TOKEN_WITH_DETAIL, e.getMessage()));
         }
     }
 
