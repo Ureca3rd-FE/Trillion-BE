@@ -4,15 +4,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.exception.SuccessResponse;
-import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.service.UserService;
 
@@ -32,7 +30,6 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
-    private final JwtUtil jwtUtil;
 
     @Operation(summary = "내 정보 조회", description = "현재 로그인한 사용자의 정보를 조회합니다.")
     @ApiResponses(value = {
@@ -67,9 +64,8 @@ public class UserController {
     })
     @GetMapping("/me")
     public ResponseEntity<SuccessResponse<Map<String, Object>>> getCurrentUser(
-            @CookieValue(value = "accessToken", required = false) String accessToken) {
+            @AuthenticationPrincipal Long userId) {
         
-        Long userId = validateAndExtractUserId(accessToken);
         UserEntity user = userService.getCurrentUser(userId);
         
         Map<String, Object> userData = new HashMap<>();
@@ -95,27 +91,14 @@ public class UserController {
     })
     @DeleteMapping("/me")
     public ResponseEntity<SuccessResponse<Void>> deleteAccount(
-            @CookieValue(value = "accessToken", required = false) String accessToken,
+            @AuthenticationPrincipal Long userId,
             HttpServletResponse response) {
         
-        Long userId = validateAndExtractUserId(accessToken);
         userService.deleteAccount(userId);
         
         deleteTokenCookies(response);
         
         return ResponseEntity.ok(SuccessResponse.of("회원 탈퇴가 완료되었습니다."));
-    }
-    
-    private Long validateAndExtractUserId(String accessToken) {
-        if (accessToken == null || accessToken.isEmpty()) {
-            throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
-        }
-        
-        if (!jwtUtil.validateToken(accessToken, "ACCESS")) {
-            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
-        }
-        
-        return jwtUtil.extractUserId(accessToken);
     }
     
     private void deleteTokenCookies(HttpServletResponse response) {
