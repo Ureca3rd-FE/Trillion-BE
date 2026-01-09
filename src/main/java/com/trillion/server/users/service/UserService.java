@@ -3,6 +3,7 @@ package com.trillion.server.users.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.trillion.server.auth.repository.RefreshTokenRepository;
 import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.entity.UserEntity.UserStatus;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     public UserEntity getCurrentUser(Long userId) {
         if (userId == null) {
@@ -35,6 +37,8 @@ public class UserService {
         if (user.getStatus() == UserStatus.DELETED) {
             throw new IllegalArgumentException(ErrorMessages.USER_ALREADY_DELETED);
         }
+        
+        refreshTokenRepository.deleteByUserId(userId);
         
         user.updateStatus(UserStatus.DELETED);
         userRepository.save(user);

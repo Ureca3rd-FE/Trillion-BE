@@ -1,5 +1,7 @@
 package com.trillion.server.common.util;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,7 +41,7 @@ public class JwtUtil {
 
         return Jwts.builder()
                 .claims(claims)
-                .subject(String.valueOf(userId))
+                .subject(userId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
                 .signWith(secretKey)
@@ -53,7 +55,7 @@ public class JwtUtil {
 
         return Jwts.builder()
                 .claims(claims)
-                .subject(String.valueOf(userId))
+                .subject(userId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
                 .signWith(secretKey)
@@ -67,7 +69,9 @@ public class JwtUtil {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-        } catch (Exception e) {
+        } catch (io.jsonwebtoken.security.SecurityException | io.jsonwebtoken.MalformedJwtException | 
+                 io.jsonwebtoken.ExpiredJwtException | io.jsonwebtoken.UnsupportedJwtException | 
+                 IllegalArgumentException e) {
             throw new IllegalArgumentException(String.format(ErrorMessages.INVALID_TOKEN_WITH_DETAIL, e.getMessage()));
         }
     }
@@ -75,8 +79,8 @@ public class JwtUtil {
     public Long extractUserId(String token) {
         Claims claims = extractClaims(token);
         Object userId = claims.get("userId");
-        if (userId instanceof Number) {
-            return ((Number) userId).longValue();
+        if (userId instanceof Number number) {
+            return number.longValue();
         }
         return Long.parseLong(claims.getSubject());
     }
@@ -91,10 +95,14 @@ public class JwtUtil {
         return (String) claims.get("type");
     }
 
+    public boolean isTokenExpired(Claims claims) {
+        return claims.getExpiration().before(new Date());
+    }
+
     public boolean isTokenExpired(String token) {
         try {
             Claims claims = extractClaims(token);
-            return claims.getExpiration().before(new Date());
+            return isTokenExpired(claims);
         } catch (Exception e) {
             return true;
         }
@@ -104,9 +112,19 @@ public class JwtUtil {
         try {
             Claims claims = extractClaims(token);
             String type = (String) claims.get("type");
-            return type != null && type.equals(expectedType) && !isTokenExpired(token);
+            return type != null && type.equals(expectedType) && !isTokenExpired(claims);
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    public LocalDateTime getTokenExpirationAsLocalDateTime(String token) {
+        try {
+            Claims claims = extractClaims(token);
+            Date expiration = claims.getExpiration();
+            return LocalDateTime.ofInstant(expiration.toInstant(), ZoneId.systemDefault());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("토큰 만료 시간을 가져올 수 없습니다: " + e.getMessage());
         }
     }
 }

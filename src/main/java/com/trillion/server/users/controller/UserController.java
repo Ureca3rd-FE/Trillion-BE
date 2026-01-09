@@ -69,15 +69,7 @@ public class UserController {
     public ResponseEntity<SuccessResponse<Map<String, Object>>> getCurrentUser(
             @CookieValue(value = "accessToken", required = false) String accessToken) {
         
-        if (accessToken == null || accessToken.isEmpty()) {
-            throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
-        }
-        
-        if (!jwtUtil.validateToken(accessToken, "ACCESS")) {
-            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
-        }
-        
-        Long userId = jwtUtil.extractUserId(accessToken);
+        Long userId = validateAndExtractUserId(accessToken);
         UserEntity user = userService.getCurrentUser(userId);
         
         Map<String, Object> userData = new HashMap<>();
@@ -106,6 +98,15 @@ public class UserController {
             @CookieValue(value = "accessToken", required = false) String accessToken,
             HttpServletResponse response) {
         
+        Long userId = validateAndExtractUserId(accessToken);
+        userService.deleteAccount(userId);
+        
+        deleteTokenCookies(response);
+        
+        return ResponseEntity.ok(SuccessResponse.of("회원 탈퇴가 완료되었습니다."));
+    }
+    
+    private Long validateAndExtractUserId(String accessToken) {
         if (accessToken == null || accessToken.isEmpty()) {
             throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
         }
@@ -114,20 +115,12 @@ public class UserController {
             throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
         }
         
-        Long userId = jwtUtil.extractUserId(accessToken);
-        userService.deleteAccount(userId);
-        
-        deleteTokenCookies(response);
-        
-        return ResponseEntity.ok(SuccessResponse.of("회원 탈퇴가 완료되었습니다."));
+        return jwtUtil.extractUserId(accessToken);
     }
     
     private void deleteTokenCookies(HttpServletResponse response) {
-        // 토큰 쿠키 삭제
         response.addHeader("Set-Cookie", "accessToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
         response.addHeader("Set-Cookie", "refreshToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
-        // 상태 쿠키 삭제
-        response.addHeader("Set-Cookie", "isNewUser=; Path=/; Max-Age=0; SameSite=Lax");
         response.addHeader("Set-Cookie", "isSignin=; Path=/; Max-Age=0; SameSite=Lax");
     }
 }

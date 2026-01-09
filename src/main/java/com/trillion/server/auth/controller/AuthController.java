@@ -3,6 +3,7 @@ package com.trillion.server.auth.controller;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,7 +49,14 @@ public class AuthController {
         @ApiResponse(responseCode = "200", description = "로그아웃 성공")
     })
     @PostMapping("/logout")
-    public ResponseEntity<SuccessResponse<Void>> logout(HttpServletResponse response) {
+    public ResponseEntity<SuccessResponse<Void>> logout(
+            @CookieValue(value = "refreshToken", required = false) String refreshToken,
+            HttpServletResponse response) {
+        
+        if (refreshToken != null && !refreshToken.isEmpty()) {
+            authService.logout(refreshToken);
+        }
+        
         deleteTokenCookies(response);
         
         return ResponseEntity.ok(SuccessResponse.of("로그아웃이 완료되었습니다."));
@@ -57,7 +65,6 @@ public class AuthController {
     private void deleteTokenCookies(HttpServletResponse response) {
         response.addHeader("Set-Cookie", "accessToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
         response.addHeader("Set-Cookie", "refreshToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
-        response.addHeader("Set-Cookie", "isNewUser=; Path=/; Max-Age=0; SameSite=Lax");
         response.addHeader("Set-Cookie", "isSignin=; Path=/; Max-Age=0; SameSite=Lax");
     }
 }

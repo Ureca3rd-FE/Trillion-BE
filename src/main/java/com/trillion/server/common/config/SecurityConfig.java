@@ -25,7 +25,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trillion.server.auth.service.AuthService;
 import com.trillion.server.common.exception.ErrorMessages;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
@@ -79,7 +78,6 @@ public class SecurityConfig {
             
             String accessToken = (String) result.get("accessToken");
             String refreshToken = (String) result.get("refreshToken");
-            Boolean isNewUser = (Boolean) result.get("isNewUser");
             
             int accessTokenMaxAge = (int) (accessTokenExpiration / 1000);
             int refreshTokenMaxAge = (int) (refreshTokenExpiration / 1000);
@@ -87,18 +85,17 @@ public class SecurityConfig {
             addTokenCookie(response, "accessToken", accessToken, accessTokenMaxAge);
             addTokenCookie(response, "refreshToken", refreshToken, refreshTokenMaxAge);
             
-            boolean isNewUserValue = isNewUser != null && isNewUser;
-            boolean isSigninValue = !isNewUserValue;
-            addPublicCookie(response, "isNewUser", String.valueOf(isNewUserValue), 60);   
-            addPublicCookie(response, "isSignin", String.valueOf(isSigninValue), accessTokenMaxAge); 
+            addPublicCookie(response, "isSignin", "true", accessTokenMaxAge); 
             
-            String redirectUri = getRedirectUriFromCookie(request);
-            
-            if (redirectUri != null && !redirectUri.isBlank()) {
-                response.sendRedirect(redirectUri);
-            } else {
-                response.sendRedirect("/");
-            }
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("success", true);
+            responseBody.put("message", "로그인 성공");
+            responseBody.putAll(result);
+
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding("UTF-8");
+            response.setStatus(HttpServletResponse.SC_OK);
+            objectMapper.writeValue(response.getWriter(), responseBody);
         };
     }
 
@@ -108,41 +105,8 @@ public class SecurityConfig {
             String error = request.getParameter("error");
             String errorDescription = request.getParameter("error_description");
             
-            String redirectUri = getRedirectUriFromCookie(request);
-            
-            if (redirectUri != null && !redirectUri.isBlank()) {
-                String redirectUrl = redirectUri + 
-                    "?success=false" +
-                    "&message=" + java.net.URLEncoder.encode(ErrorMessages.LOGIN_FAILED, java.nio.charset.StandardCharsets.UTF_8);
-                
-                if (error != null) {
-                    redirectUrl += "&error=" + java.net.URLEncoder.encode(error, java.nio.charset.StandardCharsets.UTF_8);
-                }
-                if (errorDescription != null) {
-                    redirectUrl += "&errorDescription=" + java.net.URLEncoder.encode(errorDescription, java.nio.charset.StandardCharsets.UTF_8);
-                }
-                
-                try {
-                    response.sendRedirect(redirectUrl);
-                } catch (java.io.IOException e) {
-                    sendFailureJsonResponse(response, error, errorDescription);
-                }
-            } else {
-                sendFailureJsonResponse(response, error, errorDescription);
-            }
+            sendFailureJsonResponse(response, error, errorDescription);
         };
-    }
-    
-    private String getRedirectUriFromCookie(HttpServletRequest request) {
-        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            for (jakarta.servlet.http.Cookie cookie : cookies) {
-                if ("redirect_uri".equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
     }
     
     private void addTokenCookie(HttpServletResponse response, String name, String value, int maxAge) {
@@ -174,6 +138,7 @@ public class SecurityConfig {
         try {
             objectMapper.writeValue(response.getWriter(), responseBody);
         } catch (java.io.IOException e) {
+            System.err.println("로그인 실패 응답 작성 중 오류 발생: " + e.getMessage());
         }
     }
 
