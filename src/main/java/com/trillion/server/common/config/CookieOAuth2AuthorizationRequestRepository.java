@@ -1,11 +1,14 @@
 package com.trillion.server.common.config;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -34,11 +37,17 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
     private final boolean cookieSecure;
     private final String hmacSecret;
     private final ObjectMapper objectMapper;
+    private final Set<String> allowedRedirectUris;
 
-    public CookieOAuth2AuthorizationRequestRepository(boolean cookieSecure, String hmacSecret, ObjectMapper objectMapper) {
+    public CookieOAuth2AuthorizationRequestRepository(
+            boolean cookieSecure, 
+            String hmacSecret, 
+            ObjectMapper objectMapper,
+            Set<String> allowedRedirectUris) {
         this.cookieSecure = cookieSecure;
         this.hmacSecret = hmacSecret;
         this.objectMapper = objectMapper;
+        this.allowedRedirectUris = allowedRedirectUris != null ? allowedRedirectUris : Set.of();
     }
 
     @Override
@@ -66,7 +75,13 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
         
         String redirectUriAfterLogin = request.getParameter(REDIRECT_URI_PARAM_COOKIE_NAME);
         if (redirectUriAfterLogin != null && !redirectUriAfterLogin.isBlank()) {
-            addCookie(response, REDIRECT_URI_PARAM_COOKIE_NAME, redirectUriAfterLogin, COOKIE_EXPIRE_SECONDS);
+            if (isValidRedirectUri(redirectUriAfterLogin)) {
+                String encodedRedirectUri = Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(redirectUriAfterLogin.getBytes(StandardCharsets.UTF_8));
+                addCookie(response, REDIRECT_URI_PARAM_COOKIE_NAME, encodedRedirectUri, COOKIE_EXPIRE_SECONDS);
+            } else {
+                logger.warn("허용되지 않은 redirect_uri: {}", redirectUriAfterLogin);
+            }
         }
     }
 
@@ -247,5 +262,88 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
     private boolean verifyHmac(String data, String signature) {
         String calculatedSignature = calculateHmac(data);
         return calculatedSignature.equals(signature);
+    }
+
+    private boolean isValidRedirectUri(String redirectUri) {
+        if (redirectUri == null || redirectUri.isBlank()) {
+            return false;
+        }
+
+        try {
+            URI uri = new URI(redirectUri);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            
+            if (scheme == null || host == null) {
+                return false;
+            }
+
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                logger.warn("허용되지 않은 스킴: {}", scheme);
+                return false;
+            }
+
+            if (allowedRedirectUris.isEmpty()) {
+                logger.warn("허용된 redirect URI 목록이 비어있습니다. 모든 URI가 거부됩니다.");
+                return false;
+            }
+
+            String normalizedUri = normalizeUri(uri);
+            boolean isValid = allowedRedirectUris.stream()
+                .anyMatch(allowed -> {
+                    try {
+                        URI allowedUri = new URI(allowed);
+                        String normalizedAllowed = normalizeUri(allowedUri);
+                        return normalizedUri.equals(normalizedAllowed) || 
+                               (normalizedAllowed.endsWith("/") && normalizedUri.startsWith(normalizedAllowed)) ||
+                               (!normalizedAllowed.endsWith("/") && normalizedUri.startsWith(normalizedAllowed + "/"));
+                    } catch (URISyntaxException e) {
+                        logger.warn("허용된 redirect URI 파싱 실패: {}", allowed, e);
+                        return false;
+                    }
+                });
+
+            if (!isValid) {
+                logger.warn("허용되지 않은 redirect URI: {} (허용 목록: {})", redirectUri, allowedRedirectUris);
+            }
+
+            return isValid;
+        } catch (URISyntaxException e) {
+            logger.warn("잘못된 redirect URI 형식: {}", redirectUri, e);
+            return false;
+        }
+    }
+
+    private String normalizeUri(URI uri) {
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        int port = uri.getPort();
+        String path = uri.getPath() != null ? uri.getPath() : "/";
+        
+        if (port == -1) {
+            return String.format("%s://%s%s", scheme, host, path);
+        } else {
+            return String.format("%s://%s:%d%s", scheme, host, port, path);
+        }
+    }
+
+    public String getRedirectUri(HttpServletRequest request) {
+        Cookie cookie = getCookie(request, REDIRECT_URI_PARAM_COOKIE_NAME);
+        if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+            try {
+                String decodedUri = new String(
+                    Base64.getUrlDecoder().decode(cookie.getValue()),
+                    StandardCharsets.UTF_8);
+                
+                if (isValidRedirectUri(decodedUri)) {
+                    return decodedUri;
+                } else {
+                    logger.warn("쿠키에서 읽은 redirect_uri가 유효하지 않음: {}", decodedUri);
+                }
+            } catch (IllegalArgumentException e) {
+                logger.warn("쿠키의 redirect_uri 디코딩 실패", e);
+            }
+        }
+        return null;
     }
 }

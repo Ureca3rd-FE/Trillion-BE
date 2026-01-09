@@ -23,28 +23,22 @@ public class GlobalExceptionHandler {
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {
-        logger.warn("IllegalArgumentException 발생: {}", e.getMessage());
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", e.getMessage());
-        response.put("error", "BAD_REQUEST");
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException e) {
+        logger.warn("IllegalArgumentException 발생: {}", e.getMessage(), e);
+        String safeMessage = getSafeMessage(e.getMessage());
+        ErrorResponse response = ErrorResponse.of(safeMessage, "BAD_REQUEST");
         return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleEntityNotFoundException(EntityNotFoundException e) {
-        logger.warn("EntityNotFoundException 발생: {}", e.getMessage());
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", e.getMessage());
-        response.put("error", "NOT_FOUND");
+    public ResponseEntity<ErrorResponse> handleEntityNotFoundException(EntityNotFoundException e) {
+        logger.warn("EntityNotFoundException 발생: {}", e.getMessage(), e);
+        ErrorResponse response = ErrorResponse.of(ErrorMessages.NOT_FOUND, "NOT_FOUND");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException e) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ValidationErrorResponse> handleValidationException(MethodArgumentNotValidException e) {
         Map<String, String> errors = new HashMap<>();
         
         e.getBindingResult().getAllErrors().forEach(error -> {
@@ -63,20 +57,51 @@ public class GlobalExceptionHandler {
         
         logger.warn("입력값 검증 실패: {}", errors);
         
-        response.put("success", false);
-        response.put("message", ErrorMessages.VALIDATION_FAILED);
-        response.put("errors", errors);
-        response.put("error", "VALIDATION_ERROR");
+        ValidationErrorResponse response = ValidationErrorResponse.of(ErrorMessages.VALIDATION_FAILED, errors);
         return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception e) {
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception e) {
         logger.error("처리되지 않은 예외 발생", e);
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", ErrorMessages.INTERNAL_SERVER_ERROR);
-        response.put("error", "INTERNAL_SERVER_ERROR");
+        ErrorResponse response = ErrorResponse.of(ErrorMessages.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+
+    private String getSafeMessage(String exceptionMessage) {
+        if (exceptionMessage == null) {
+            return ErrorMessages.BAD_REQUEST;
+        }
+
+        String message = exceptionMessage.trim();
+        
+        if (message.contains(ErrorMessages.AUTH_TOKEN_REQUIRED) || 
+            message.contains(ErrorMessages.INVALID_TOKEN) ||
+            message.contains(ErrorMessages.INVALID_REFRESH_TOKEN) ||
+            message.contains(ErrorMessages.REFRESH_TOKEN_REQUIRED)) {
+            return message;
+        }
+        
+        if (message.contains(ErrorMessages.USER_NOT_FOUND)) {
+            return ErrorMessages.USER_NOT_FOUND;
+        }
+        
+        if (message.contains(ErrorMessages.USER_ALREADY_DELETED)) {
+            return ErrorMessages.USER_ALREADY_DELETED;
+        }
+        
+        if (message.contains(ErrorMessages.USER_ID_REQUIRED)) {
+            return ErrorMessages.USER_ID_REQUIRED;
+        }
+        
+        if (message.contains("탈퇴한 사용자")) {
+            return ErrorMessages.USER_ALREADY_DELETED;
+        }
+        
+        if (message.contains("로그인")) {
+            return ErrorMessages.LOGIN_FAILED;
+        }
+        
+        return ErrorMessages.BAD_REQUEST;
     }
 }

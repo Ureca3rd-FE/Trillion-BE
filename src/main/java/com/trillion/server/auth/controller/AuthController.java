@@ -1,6 +1,5 @@
 package com.trillion.server.auth.controller;
 
-import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -9,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.trillion.server.auth.dto.TokenRefreshResponse;
 import com.trillion.server.auth.service.AuthService;
 import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.exception.SuccessResponse;
@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -34,13 +35,13 @@ public class AuthController {
         @ApiResponse(responseCode = "400", description = "유효하지 않은 리프레시 토큰")
     })
     @PostMapping("/refresh")
-    public ResponseEntity<SuccessResponse<Map<String, Object>>> refreshToken(@RequestBody Map<String, String> request) {
+    public ResponseEntity<SuccessResponse<TokenRefreshResponse>> refreshToken(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
         if (refreshToken == null || refreshToken.isEmpty()) {
             throw new IllegalArgumentException(ErrorMessages.REFRESH_TOKEN_REQUIRED);
         }
         
-        Map<String, Object> tokenData = authService.refreshTokens(refreshToken);
+        TokenRefreshResponse tokenData = authService.refreshTokens(refreshToken);
         return ResponseEntity.ok(SuccessResponse.of(tokenData));
     }
 

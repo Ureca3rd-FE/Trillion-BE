@@ -1,7 +1,5 @@
 package com.trillion.server.users.controller;
 
-import java.util.HashMap;
-import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -11,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trillion.server.common.exception.SuccessResponse;
+import com.trillion.server.users.dto.UserResponse;
 import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.service.UserService;
 
@@ -63,24 +62,25 @@ public class UserController {
         @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
     })
     @GetMapping("/me")
-    public ResponseEntity<SuccessResponse<Map<String, Object>>> getCurrentUser(
+    public ResponseEntity<SuccessResponse<UserResponse>> getCurrentUser(
             @AuthenticationPrincipal Long userId) {
         
         UserEntity user = userService.getCurrentUser(userId);
         
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("userId", user.getId());
-        userData.put("kakaoId", user.getKakaoId());
-        userData.put("nickname", user.getNickname());
-        userData.put("profileImageUrl", user.getProfileImageUrl());
-        userData.put("thumbnailImageUrl", user.getThumbnailImageUrl());
-        userData.put("role", user.getRole().name());
-        userData.put("status", user.getStatus().name());
-        userData.put("lastLoginAt", user.getLastLoginAt());
-        userData.put("createdAt", user.getCreatedAt());
-        userData.put("updatedAt", user.getUpdatedAt());
+        UserResponse userResponse = UserResponse.builder()
+                .userId(user.getId())
+                .kakaoId(user.getKakaoId())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .thumbnailImageUrl(user.getThumbnailImageUrl())
+                .role(user.getRole().name())
+                .status(user.getStatus().name())
+                .lastLoginAt(user.getLastLoginAt())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
         
-        return ResponseEntity.ok(SuccessResponse.of(userData));
+        return ResponseEntity.ok(SuccessResponse.of(userResponse));
     }
 
     @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 탈퇴 처리합니다.")

@@ -1,7 +1,6 @@
 package com.trillion.server.auth.service;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -11,6 +10,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.trillion.server.auth.dto.LoginResponse;
+import com.trillion.server.auth.dto.TokenRefreshResponse;
 import com.trillion.server.auth.entity.RefreshToken;
 import com.trillion.server.auth.repository.RefreshTokenRepository;
 import com.trillion.server.common.exception.ErrorMessages;
@@ -33,7 +34,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
-    public Map<String, Object> processKakaoLogin(OAuth2User oAuth2User) {
+    public LoginResponse processKakaoLogin(OAuth2User oAuth2User) {
         if (oAuth2User == null) {
             throw new IllegalArgumentException("OAuth2User가 null입니다.");
         }
@@ -115,21 +116,20 @@ public class AuthService {
                 .build();
         refreshTokenRepository.save(refreshTokenEntity);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("userId", savedUser.getId());
-        result.put("kakaoId", kakaoId);
-        result.put("nickname", savedUser.getNickname());
-        result.put("profileImageUrl", savedUser.getProfileImageUrl());
-        result.put("thumbnailImageUrl", savedUser.getThumbnailImageUrl());
-        result.put("role", savedUser.getRole().name());
-        result.put("accessToken", accessToken);
-        result.put("refreshToken", refreshToken);
-        
-        return result;
+        return LoginResponse.builder()
+                .userId(savedUser.getId())
+                .kakaoId(kakaoId)
+                .nickname(savedUser.getNickname())
+                .profileImageUrl(savedUser.getProfileImageUrl())
+                .thumbnailImageUrl(savedUser.getThumbnailImageUrl())
+                .role(savedUser.getRole().name())
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
     }
 
     @Transactional
-    public Map<String, Object> refreshTokens(String refreshToken) {
+    public TokenRefreshResponse refreshTokens(String refreshToken) {
         if (!jwtUtil.validateToken(refreshToken, "REFRESH")) {
             throw new IllegalArgumentException(ErrorMessages.INVALID_REFRESH_TOKEN);
         }
@@ -176,11 +176,10 @@ public class AuthService {
                 .build();
         refreshTokenRepository.save(newRefreshTokenEntity);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("accessToken", newAccessToken);
-        result.put("refreshToken", newRefreshToken);
-        
-        return result;
+        return TokenRefreshResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .build();
     }
     
     @Transactional

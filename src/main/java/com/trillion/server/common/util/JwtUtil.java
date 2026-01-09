@@ -8,6 +8,8 @@ import java.util.Map;
 
 import javax.crypto.SecretKey;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +21,8 @@ import io.jsonwebtoken.security.Keys;
 
 @Component
 public class JwtUtil {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
 
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
@@ -72,7 +76,8 @@ public class JwtUtil {
         } catch (io.jsonwebtoken.security.SecurityException | io.jsonwebtoken.MalformedJwtException | 
                  io.jsonwebtoken.ExpiredJwtException | io.jsonwebtoken.UnsupportedJwtException | 
                  IllegalArgumentException e) {
-            throw new IllegalArgumentException(String.format(ErrorMessages.INVALID_TOKEN_WITH_DETAIL, e.getMessage()));
+            logger.debug("JWT 토큰 파싱 실패: {}", e.getMessage());
+            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
         }
     }
 
@@ -124,7 +129,8 @@ public class JwtUtil {
             Date expiration = claims.getExpiration();
             return LocalDateTime.ofInstant(expiration.toInstant(), ZoneId.systemDefault());
         } catch (Exception e) {
-            throw new IllegalArgumentException("토큰 만료 시간을 가져올 수 없습니다: " + e.getMessage());
+            logger.debug("토큰 만료 시간을 가져올 수 없습니다: {}", e.getMessage());
+            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
         }
     }
 }

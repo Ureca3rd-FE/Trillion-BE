@@ -19,5 +19,8 @@ public final class ErrorMessages {
     public static final String INTERNAL_SERVER_ERROR = "서버 오류가 발생했습니다.";
     public static final String LOGIN_FAILED = "로그인에 실패했습니다.";
     
-    public static final String INVALID_TOKEN_WITH_DETAIL = "유효하지 않은 토큰입니다: %s";
+    public static final String BAD_REQUEST = "잘못된 요청입니다.";
+    public static final String NOT_FOUND = "요청한 리소스를 찾을 수 없습니다.";
+    public static final String UNAUTHORIZED = "인증이 필요합니다.";
+    public static final String FORBIDDEN = "접근 권한이 없습니다.";
 }
