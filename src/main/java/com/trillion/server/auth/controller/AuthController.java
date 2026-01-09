@@ -1,6 +1,5 @@
 package com.trillion.server.auth.controller;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
@@ -10,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trillion.server.auth.service.AuthService;
+import com.trillion.server.common.exception.SuccessResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,14 +32,14 @@ public class AuthController {
         @ApiResponse(responseCode = "400", description = "유효하지 않은 리프레시 토큰")
     })
     @PostMapping("/refresh")
-    public ResponseEntity<Map<String, Object>> refreshToken(@RequestBody Map<String, String> request) {
+    public ResponseEntity<SuccessResponse<Map<String, Object>>> refreshToken(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
         if (refreshToken == null || refreshToken.isEmpty()) {
             throw new IllegalArgumentException("리프레시 토큰이 필요합니다.");
         }
         
-        Map<String, Object> result = authService.refreshTokens(refreshToken);
-        return ResponseEntity.ok(result);
+        Map<String, Object> tokenData = authService.refreshTokens(refreshToken);
+        return ResponseEntity.ok(SuccessResponse.of(tokenData));
     }
 
     @Operation(summary = "로그아웃", description = "현재 로그인한 사용자를 로그아웃 처리하고 토큰 쿠키를 삭제합니다.")
@@ -47,14 +47,10 @@ public class AuthController {
         @ApiResponse(responseCode = "200", description = "로그아웃 성공")
     })
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {
+    public ResponseEntity<SuccessResponse<Void>> logout(HttpServletResponse response) {
         deleteTokenCookies(response);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("message", "로그아웃이 완료되었습니다.");
-        
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(SuccessResponse.of("로그아웃이 완료되었습니다."));
     }
     
     private void deleteTokenCookies(HttpServletResponse response) {

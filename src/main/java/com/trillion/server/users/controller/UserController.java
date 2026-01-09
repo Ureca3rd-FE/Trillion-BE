@@ -10,8 +10,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trillion.server.users.entity.UserEntity;
+import com.trillion.server.common.exception.SuccessResponse;
 import com.trillion.server.common.util.JwtUtil;
+import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,16 +43,19 @@ public class UserController {
                 examples = @ExampleObject(
                     value = """
                         {
-                          "userId": 1,
-                          "kakaoId": "123456789",
-                          "nickname": "홍길동",
-                          "profileImageUrl": "https://k.kakaocdn.net/dn/example/profile.jpg",
-                          "thumbnailImageUrl": "https://k.kakaocdn.net/dn/example/thumb.jpg",
-                          "role": "USER",
-                          "status": "ACTIVE",
-                          "lastLoginAt": "2024-01-08T10:30:00",
-                          "createdAt": "2024-01-01T00:00:00",
-                          "updatedAt": "2024-01-08T10:30:00"
+                          "success": true,
+                          "data": {
+                            "userId": 1,
+                            "kakaoId": "123456789",
+                            "nickname": "홍길동",
+                            "profileImageUrl": "https://k.kakaocdn.net/dn/example/profile.jpg",
+                            "thumbnailImageUrl": "https://k.kakaocdn.net/dn/example/thumb.jpg",
+                            "role": "USER",
+                            "status": "ACTIVE",
+                            "lastLoginAt": "2024-01-08T10:30:00",
+                            "createdAt": "2024-01-01T00:00:00",
+                            "updatedAt": "2024-01-08T10:30:00"
+                          }
                         }
                         """
                 )
@@ -61,7 +65,7 @@ public class UserController {
         @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
     })
     @GetMapping("/me")
-    public ResponseEntity<Map<String, Object>> getCurrentUser(
+    public ResponseEntity<SuccessResponse<Map<String, Object>>> getCurrentUser(
             @CookieValue(value = "accessToken", required = false) String accessToken) {
         
         if (accessToken == null || accessToken.isEmpty()) {
@@ -75,19 +79,19 @@ public class UserController {
         Long userId = jwtUtil.extractUserId(accessToken);
         UserEntity user = userService.getCurrentUser(userId);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("userId", user.getId());
-        result.put("kakaoId", user.getKakaoId());
-        result.put("nickname", user.getNickname());
-        result.put("profileImageUrl", user.getProfileImageUrl());
-        result.put("thumbnailImageUrl", user.getThumbnailImageUrl());
-        result.put("role", user.getRole().name());
-        result.put("status", user.getStatus().name());
-        result.put("lastLoginAt", user.getLastLoginAt());
-        result.put("createdAt", user.getCreatedAt());
-        result.put("updatedAt", user.getUpdatedAt());
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("userId", user.getId());
+        userData.put("kakaoId", user.getKakaoId());
+        userData.put("nickname", user.getNickname());
+        userData.put("profileImageUrl", user.getProfileImageUrl());
+        userData.put("thumbnailImageUrl", user.getThumbnailImageUrl());
+        userData.put("role", user.getRole().name());
+        userData.put("status", user.getStatus().name());
+        userData.put("lastLoginAt", user.getLastLoginAt());
+        userData.put("createdAt", user.getCreatedAt());
+        userData.put("updatedAt", user.getUpdatedAt());
         
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(SuccessResponse.of(userData));
     }
 
     @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 탈퇴 처리합니다.")
@@ -97,7 +101,7 @@ public class UserController {
         @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
     })
     @DeleteMapping("/me")
-    public ResponseEntity<Map<String, Object>> deleteAccount(
+    public ResponseEntity<SuccessResponse<Void>> deleteAccount(
             @CookieValue(value = "accessToken", required = false) String accessToken,
             HttpServletResponse response) {
         
@@ -114,11 +118,7 @@ public class UserController {
         
         deleteTokenCookies(response);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("message", "회원 탈퇴가 완료되었습니다.");
-        
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(SuccessResponse.of("회원 탈퇴가 완료되었습니다."));
     }
     
     private void deleteTokenCookies(HttpServletResponse response) {
