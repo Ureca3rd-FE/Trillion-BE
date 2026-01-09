@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,6 +38,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
+
     private final AuthService authService;
     private final ObjectMapper objectMapper;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -45,6 +49,9 @@ public class SecurityConfig {
     
     @Value("${jwt.refresh-token-expiration:604800000}")
     private long refreshTokenExpiration;
+    
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -115,14 +122,16 @@ public class SecurityConfig {
     }
     
     private void addTokenCookie(HttpServletResponse response, String name, String value, int maxAge) {
-        String cookieValue = String.format("%s=%s; Path=/; HttpOnly; Max-Age=%d; SameSite=Lax", 
-            name, value, maxAge);
+        String secureFlag = cookieSecure ? "; Secure" : "";
+        String cookieValue = String.format("%s=%s; Path=/; HttpOnly; Max-Age=%d; SameSite=Lax%s", 
+            name, value, maxAge, secureFlag);
         response.addHeader("Set-Cookie", cookieValue);
     }
     
     private void addPublicCookie(HttpServletResponse response, String name, String value, int maxAge) {
-        String cookieValue = String.format("%s=%s; Path=/; Max-Age=%d; SameSite=Lax", 
-            name, value, maxAge);
+        String secureFlag = cookieSecure ? "; Secure" : "";
+        String cookieValue = String.format("%s=%s; Path=/; Max-Age=%d; SameSite=Lax%s", 
+            name, value, maxAge, secureFlag);
         response.addHeader("Set-Cookie", cookieValue);
     }
     
@@ -143,13 +152,13 @@ public class SecurityConfig {
         try {
             objectMapper.writeValue(response.getWriter(), responseBody);
         } catch (java.io.IOException e) {
-            System.err.println("로그인 실패 응답 작성 중 오류 발생: " + e.getMessage());
+            logger.error("로그인 실패 응답 작성 중 오류 발생", e);
         }
     }
 
     @Bean
     public AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository() {
-        return new CookieOAuth2AuthorizationRequestRepository();
+        return new CookieOAuth2AuthorizationRequestRepository(cookieSecure);
     }
 
     @Bean

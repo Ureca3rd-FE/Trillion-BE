@@ -19,6 +19,12 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
     private static final String OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME = "oauth2_auth_request";
     private static final String REDIRECT_URI_PARAM_COOKIE_NAME = "redirect_uri";
     private static final int COOKIE_EXPIRE_SECONDS = 180;
+    
+    private final boolean cookieSecure;
+    
+    public CookieOAuth2AuthorizationRequestRepository(boolean cookieSecure) {
+        this.cookieSecure = cookieSecure;
+    }
 
     @Override
     public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
@@ -69,7 +75,7 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
         cookie.setPath("/");
         cookie.setHttpOnly(true);
         cookie.setMaxAge(maxAge);
-        cookie.setSecure(false);
+        cookie.setSecure(cookieSecure);
         response.addCookie(cookie);
     }
 

@@ -6,12 +6,16 @@ import java.util.ArrayList;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.trillion.server.common.util.JwtUtil;
+import com.trillion.server.users.entity.UserEntity.UserStatus;
+import com.trillion.server.users.repository.UserRepository;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,7 +28,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, 
@@ -37,10 +44,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String role = jwtUtil.extractRole(token);
                 
                 if (userId != null && role != null) {
-                    Authentication authentication = createAuthentication(userId, role);
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    userRepository.findById(userId).ifPresentOrElse(
+                        user -> {
+                            if (user.getStatus() == UserStatus.DELETED) {
+                                logger.warn("탈퇴한 사용자의 인증 시도: userId={}", userId);
+                                SecurityContextHolder.clearContext();
+                            } else if (user.getStatus() != UserStatus.ACTIVE) {
+                                logger.warn("비활성 사용자의 인증 시도: userId={}, status={}", userId, user.getStatus());
+                                SecurityContextHolder.clearContext();
+                            } else {
+                                Authentication authentication = createAuthentication(userId, role);
+                                SecurityContextHolder.getContext().setAuthentication(authentication);
+                            }
+                        },
+                        () -> {
+                            logger.warn("존재하지 않는 사용자의 인증 시도: userId={}", userId);
+                            SecurityContextHolder.clearContext();
+                        }
+                    );
                 }
             } catch (Exception e) {
+                logger.debug("JWT 인증 필터에서 예외 발생", e);
                 SecurityContextHolder.clearContext();
             }
         }

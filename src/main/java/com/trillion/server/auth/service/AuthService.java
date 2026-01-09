@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
@@ -79,6 +83,10 @@ public class AuthService {
         
         if (existingUser.isPresent()) {
             user = existingUser.get();
+            if (user.getStatus() == UserStatus.DELETED) {
+                logger.warn("탈퇴한 사용자가 로그인 시도: userId={}, kakaoId={}", user.getId(), kakaoId);
+                throw new IllegalArgumentException("탈퇴한 사용자는 로그인할 수 없습니다.");
+            }
             user.updateProfile(nickname, profileImageUrl, thumbnailImageUrl);
             user.updateLastLoginAt();
         } else {
@@ -141,6 +149,18 @@ public class AuthService {
         
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
+        
+        if (user.getStatus() == UserStatus.DELETED) {
+            logger.warn("탈퇴한 사용자의 토큰 갱신 시도: userId={}", userId);
+            refreshTokenRepository.delete(existingToken);
+            throw new IllegalArgumentException("탈퇴한 사용자의 토큰은 갱신할 수 없습니다.");
+        }
+        
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            logger.warn("비활성 사용자의 토큰 갱신 시도: userId={}, status={}", userId, user.getStatus());
+            refreshTokenRepository.delete(existingToken);
+            throw new IllegalArgumentException("비활성 사용자의 토큰은 갱신할 수 없습니다.");
+        }
         
         refreshTokenRepository.delete(existingToken);
         

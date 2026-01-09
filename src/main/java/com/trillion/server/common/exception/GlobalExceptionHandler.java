@@ -3,6 +3,8 @@ package com.trillion.server.common.exception;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -17,8 +19,11 @@ import jakarta.persistence.EntityNotFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {
+        logger.warn("IllegalArgumentException 발생: {}", e.getMessage());
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", e.getMessage());
@@ -28,6 +33,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleEntityNotFoundException(EntityNotFoundException e) {
+        logger.warn("EntityNotFoundException 발생: {}", e.getMessage());
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", e.getMessage());
@@ -46,6 +52,8 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
         
+        logger.warn("입력값 검증 실패: {}", errors);
+        
         response.put("success", false);
         response.put("message", ErrorMessages.VALIDATION_FAILED);
         response.put("errors", errors);
@@ -55,6 +63,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception e) {
+        logger.error("처리되지 않은 예외 발생", e);
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", ErrorMessages.INTERNAL_SERVER_ERROR);
