@@ -52,6 +52,9 @@ public class SecurityConfig {
     
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
+    
+    @Value("${app.oauth2.hmac-secret:${jwt.secret}}")
+    private String oauth2HmacSecret;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -69,7 +72,7 @@ public class SecurityConfig {
             )
             .oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(authorization -> authorization
-                    .authorizationRequestRepository(authorizationRequestRepository())
+                    .authorizationRequestRepository(authorizationRequestRepository(oauth2HmacSecret))
                     .baseUri("/oauth2/authorization")
                 )
                 .redirectionEndpoint(redirection -> redirection
@@ -157,8 +160,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository() {
-        return new CookieOAuth2AuthorizationRequestRepository(cookieSecure);
+    public AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository(String hmacSecret) {
+        return new CookieOAuth2AuthorizationRequestRepository(cookieSecure, hmacSecret, objectMapper);
     }
 
     @Bean

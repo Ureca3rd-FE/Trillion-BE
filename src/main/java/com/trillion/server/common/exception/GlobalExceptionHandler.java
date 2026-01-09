@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,9 +48,17 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         
         e.getBindingResult().getAllErrors().forEach(error -> {
-            String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+            if (error instanceof FieldError) {
+                FieldError fieldError = (FieldError) error;
+                errors.put(fieldError.getField(), errorMessage);
+            } else if (error instanceof ObjectError) {
+                ObjectError objectError = (ObjectError) error;
+                String objectName = objectError.getObjectName();
+                errors.put(objectName, errorMessage);
+            } else {
+                errors.put("error", errorMessage);
+            }
         });
         
         logger.warn("입력값 검증 실패: {}", errors);
