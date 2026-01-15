@@ -1,6 +1,7 @@
 package com.trillion.server;
 
 //import com.trillion.server.util.GeminiUtil;
+import com.trillion.server.util.GeminiUtil;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
