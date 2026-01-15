@@ -1,5 +1,6 @@
 package com.trillion.server.common.config;
 
+import io.swagger.v3.oas.models.security.SecurityRequirement;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -14,18 +15,20 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI openAPI() {
         String jwt = "JWT";
-        Components components = new Components().addSecuritySchemes(jwt, new SecurityScheme()
+
+        SecurityRequirement securityRequirement = new SecurityRequirement().addList(jwt);
+        SecurityScheme securityScheme = new SecurityScheme()
                 .name(jwt)
                 .type(SecurityScheme.Type.HTTP)
                 .scheme("bearer")
-                .bearerFormat("JWT")
-                .description("JWT 토큰을 입력하세요. Bearer 접두사는 생략 가능합니다."));
+                .bearerFormat("JWT");
 
         return new OpenAPI()
                 .info(new Info()
-                        .title("Trillion API")
-                        .description("Trillion 백엔드 API 문서")
+                        .title("SO:U+ API")
+                        .description("SO:U+ 백엔드 API 문서")
                         .version("v1.0.0"))
-                .components(components);
+                .addSecurityItem(securityRequirement)
+                .components(new Components().addSecuritySchemes(jwt, securityScheme));
     }
 }
