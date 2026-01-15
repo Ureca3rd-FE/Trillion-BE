@@ -1,21 +1,20 @@
 package com.trillion.server.common.config;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.trillion.server.auth.filter.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
@@ -26,12 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.trillion.server.auth.dto.LoginResponse;
 import com.trillion.server.auth.service.AuthService;
-import com.trillion.server.common.exception.ErrorMessages;
-import com.trillion.server.common.exception.ErrorResponse;
-import com.trillion.server.common.exception.SuccessResponse;
-import com.trillion.server.common.filter.JwtAuthenticationFilter;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -41,31 +35,15 @@ import lombok.RequiredArgsConstructor;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-
-    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
-
     private final AuthService authService;
     private final ObjectMapper objectMapper;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    
-    @Autowired
-    @Lazy
-    private CookieOAuth2AuthorizationRequestRepository authorizationRequestRepository;
     
     @Value("${jwt.access-token-expiration:3600000}")
     private long accessTokenExpiration;
     
     @Value("${jwt.refresh-token-expiration:604800000}")
     private long refreshTokenExpiration;
-    
-    @Value("${app.cookie.secure:false}")
-    private boolean cookieSecure;
-    
-    @Value("${app.oauth2.hmac-secret:${jwt.secret}}")
-    private String oauth2HmacSecret;
-    
-    @Value("${app.oauth2.allowed-redirect-uris:http://localhost:3000,http://localhost:5173}")
-    private String allowedRedirectUrisConfig;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -73,14 +51,23 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/login/**", "/oauth2/**", "/error").permitAll()
+                .requestMatchers("/auth/refresh", "/login/**", "/oauth2/**", "/error").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
                 .anyRequest().authenticated()
             )
+
+            .exceptionHandling(exception -> exception
+                    .authenticationEntryPoint((request, response, authException) -> {
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.getWriter().write("{\"success\": false, \"message\": \"인증되지 않은 사용자입니다.\", \"error\": \"UNAUTHORIZED\"}");
+                    })
+            )
+
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(authorization -> authorization
                     .authorizationRequestRepository(authorizationRequestRepository())
@@ -93,6 +80,7 @@ public class SecurityConfig {
                 .failureHandler(oauth2LoginFailureHandler())
             );
 
+
         return http.build();
     }
 
@@ -100,10 +88,10 @@ public class SecurityConfig {
     public AuthenticationSuccessHandler oauth2LoginSuccessHandler() {
         return (request, response, authentication) -> {
             OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-            LoginResponse loginResponse = authService.processKakaoLogin(oAuth2User);
+            Map<String, Object> result = authService.processKakaoLogin(oAuth2User);
             
-            String accessToken = loginResponse.getAccessToken();
-            String refreshToken = loginResponse.getRefreshToken();
+            String accessToken = (String) result.get("accessToken");
+            String refreshToken = (String) result.get("refreshToken");
             
             int accessTokenMaxAge = (int) (accessTokenExpiration / 1000);
             int refreshTokenMaxAge = (int) (refreshTokenExpiration / 1000);
@@ -111,14 +99,17 @@ public class SecurityConfig {
             addTokenCookie(response, "accessToken", accessToken, accessTokenMaxAge);
             addTokenCookie(response, "refreshToken", refreshToken, refreshTokenMaxAge);
             
-            addPublicCookie(response, "isSignin", "true", accessTokenMaxAge); 
+            String redirectUri = getRedirectUriFromCookie(request);
             
-            String redirectUri = authorizationRequestRepository.getRedirectUri(request);
-            if (redirectUri != null) {
+            if (redirectUri != null && !redirectUri.isBlank()) {
                 String redirectUrl = redirectUri + "?success=true";
                 response.sendRedirect(redirectUrl);
             } else {
-                SuccessResponse<LoginResponse> responseBody = SuccessResponse.of("로그인 성공", loginResponse);
+                Map<String, Object> responseBody = new HashMap<>();
+                responseBody.put("success", true);
+                responseBody.put("message", "로그인 성공");
+                responseBody.putAll(result);
+
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.setCharacterEncoding("UTF-8");
                 response.setStatus(HttpServletResponse.SC_OK);
@@ -133,16 +124,23 @@ public class SecurityConfig {
             String error = request.getParameter("error");
             String errorDescription = request.getParameter("error_description");
             
-            logger.warn("OAuth2 로그인 실패: error={}, errorDescription={}", error, errorDescription);
+            String redirectUri = getRedirectUriFromCookie(request);
             
-            String redirectUri = authorizationRequestRepository.getRedirectUri(request);
-            if (redirectUri != null) {
-                String errorCode = error != null ? error : "LOGIN_FAILED";
-                String redirectUrl = redirectUri + "?success=false&error=" + errorCode;
+            if (redirectUri != null && !redirectUri.isBlank()) {
+                String redirectUrl = redirectUri + 
+                    "?success=false" +
+                    "&message=" + java.net.URLEncoder.encode("로그인에 실패했습니다.", java.nio.charset.StandardCharsets.UTF_8);
+                
+                if (error != null) {
+                    redirectUrl += "&error=" + java.net.URLEncoder.encode(error, java.nio.charset.StandardCharsets.UTF_8);
+                }
+                if (errorDescription != null) {
+                    redirectUrl += "&errorDescription=" + java.net.URLEncoder.encode(errorDescription, java.nio.charset.StandardCharsets.UTF_8);
+                }
+                
                 try {
                     response.sendRedirect(redirectUrl);
                 } catch (java.io.IOException e) {
-                    logger.error("리다이렉트 실패", e);
                     sendFailureJsonResponse(response, error, errorDescription);
                 }
             } else {
@@ -151,24 +149,40 @@ public class SecurityConfig {
         };
     }
     
-    private void addTokenCookie(HttpServletResponse response, String name, String value, int maxAge) {
-        String secureFlag = cookieSecure ? "; Secure" : "";
-        String cookieValue = String.format("%s=%s; Path=/; HttpOnly; Max-Age=%d; SameSite=Lax%s", 
-            name, value, maxAge, secureFlag);
-        response.addHeader("Set-Cookie", cookieValue);
+    private String getRedirectUriFromCookie(HttpServletRequest request) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (jakarta.servlet.http.Cookie cookie : cookies) {
+                if ("redirect_uri".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
-    
-    private void addPublicCookie(HttpServletResponse response, String name, String value, int maxAge) {
-        String secureFlag = cookieSecure ? "; Secure" : "";
-        String cookieValue = String.format("%s=%s; Path=/; Max-Age=%d; SameSite=Lax%s", 
-            name, value, maxAge, secureFlag);
-        response.addHeader("Set-Cookie", cookieValue);
+
+    private void addTokenCookie(HttpServletResponse response, String name, String value, int maxAge) {
+        ResponseCookie cookie = ResponseCookie.from(name, value)
+                .path("/")
+                .sameSite("Lax")
+                .httpOnly(true)
+                .secure(false)
+                .maxAge(maxAge)
+                .build();
+
+        response.addHeader("Set-Cookie", cookie.toString());
     }
     
     private void sendFailureJsonResponse(HttpServletResponse response, String error, String errorDescription) {
-        String errorCode = error != null ? error : "LOGIN_FAILED";
-        logger.warn("OAuth2 로그인 실패: error={}, errorDescription={}", error, errorDescription);
-        ErrorResponse responseBody = ErrorResponse.of(ErrorMessages.LOGIN_FAILED, errorCode);
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("success", false);
+        responseBody.put("message", "로그인에 실패했습니다.");
+        if (error != null) {
+            responseBody.put("error", error);
+        }
+        if (errorDescription != null) {
+            responseBody.put("errorDescription", errorDescription);
+        }
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
@@ -176,22 +190,12 @@ public class SecurityConfig {
         try {
             objectMapper.writeValue(response.getWriter(), responseBody);
         } catch (java.io.IOException e) {
-            logger.error("로그인 실패 응답 작성 중 오류 발생", e);
         }
     }
 
     @Bean
-    public CookieOAuth2AuthorizationRequestRepository authorizationRequestRepository() {
-        Set<String> allowedRedirectUris = Arrays.stream(allowedRedirectUrisConfig.split(","))
-            .map(String::trim)
-            .filter(uri -> !uri.isEmpty())
-            .collect(Collectors.toSet());
-        
-        return new CookieOAuth2AuthorizationRequestRepository(
-            cookieSecure, 
-            oauth2HmacSecret, 
-            objectMapper,
-            allowedRedirectUris);
+    public AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository() {
+        return new CookieOAuth2AuthorizationRequestRepository();
     }
 
     @Bean
