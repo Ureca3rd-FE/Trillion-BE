@@ -1,24 +1,15 @@
 package com.trillion.server.auth.controller;
 
-
+import java.util.Map;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.trillion.server.auth.dto.TokenRefreshResponse;
+import org.springframework.web.bind.annotation.*;
 import com.trillion.server.auth.service.AuthService;
-import com.trillion.server.common.exception.ErrorMessages;
-import com.trillion.server.common.exception.SuccessResponse;
-
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -31,41 +22,55 @@ public class AuthController {
 
     @Operation(summary = "JWT 토큰 갱신", description = "Refresh Token을 사용하여 새로운 Access Token과 Refresh Token을 발급합니다.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "토큰 갱신 성공"),
-        @ApiResponse(responseCode = "400", description = "유효하지 않은 리프레시 토큰")
+            @ApiResponse(responseCode = "200", description = "토큰 갱신 성공"),
+            @ApiResponse(responseCode = "400", description = "유효하지 않은 토큰")
     })
     @PostMapping("/refresh")
-    public ResponseEntity<SuccessResponse<TokenRefreshResponse>> refreshToken(@RequestBody Map<String, String> request) {
-        String refreshToken = request.get("refreshToken");
-        if (refreshToken == null || refreshToken.isEmpty()) {
-            throw new IllegalArgumentException(ErrorMessages.REFRESH_TOKEN_REQUIRED);
+    public ResponseEntity<?> refreshToken(
+            @CookieValue(value = "refreshToken", required = false) String refreshToken, HttpServletResponse response){
+
+        if(refreshToken == null || refreshToken.isEmpty()){
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "리프레시 토큰이 쿠키에 없습니다."));
         }
-        
-        TokenRefreshResponse tokenData = authService.refreshTokens(refreshToken);
-        return ResponseEntity.ok(SuccessResponse.of(tokenData));
+
+        try{
+            Map<String, Object> tokens = authService.refreshTokens(refreshToken);
+
+            String newAccessToken = (String) tokens.get("accessToken");
+            String newRefreshToken = (String) tokens.get("refreshToken");
+
+            setCookie(response, "accessToken", newAccessToken, 3600);
+            setCookie(response, "refreshToken", newRefreshToken, 604800);
+
+            return ResponseEntity.ok().body(Map.of("success", true, "message", "토큰이 갱신되었습니다."));
+        } catch (IllegalArgumentException e){
+            deleteCookie(response, "accessToken");
+            deleteCookie(response, "refreshToken");
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", e.getMessage()));
+        }
     }
 
-    @Operation(summary = "로그아웃", description = "현재 로그인한 사용자를 로그아웃 처리하고 토큰 쿠키를 삭제합니다.")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "로그아웃 성공")
-    })
-    @PostMapping("/logout")
-    public ResponseEntity<SuccessResponse<Void>> logout(
-            @CookieValue(value = "refreshToken", required = false) String refreshToken,
-            HttpServletResponse response) {
-        
-        if (refreshToken != null && !refreshToken.isEmpty()) {
-            authService.logout(refreshToken);
-        }
-        
-        deleteTokenCookies(response);
-        
-        return ResponseEntity.ok(SuccessResponse.of("로그아웃이 완료되었습니다."));
+    private void setCookie(HttpServletResponse response, String name, String value, int maxAge) {
+        ResponseCookie cookie = ResponseCookie.from(name, value)
+                .path("/")
+                .sameSite("Lax")
+                .httpOnly(true)
+                .secure(false)
+                .maxAge(maxAge)
+                .build();
+
+        response.addHeader("Set-Cookie", cookie.toString());
     }
-    
-    private void deleteTokenCookies(HttpServletResponse response) {
-        response.addHeader("Set-Cookie", "accessToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
-        response.addHeader("Set-Cookie", "refreshToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
-        response.addHeader("Set-Cookie", "isSignin=; Path=/; Max-Age=0; SameSite=Lax");
+
+    private void deleteCookie(HttpServletResponse response, String name) {
+        ResponseCookie cookie = ResponseCookie.from(name, "")
+                .path("/")
+                .sameSite("Lax")
+                .httpOnly(true)
+                .secure(false)
+                .maxAge(0)
+                .build();
+        response.addHeader("Set-Cookie", cookie.toString());
     }
 }
+
