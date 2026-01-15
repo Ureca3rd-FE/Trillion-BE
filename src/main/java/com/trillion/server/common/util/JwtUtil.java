@@ -1,19 +1,13 @@
 package com.trillion.server.common.util;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import javax.crypto.SecretKey;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import com.trillion.server.common.exception.ErrorMessages;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -21,8 +15,6 @@ import io.jsonwebtoken.security.Keys;
 
 @Component
 public class JwtUtil {
-
-    private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
 
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
@@ -40,12 +32,11 @@ public class JwtUtil {
     public String generateAccessToken(Long userId, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
-        claims.put("role", role);
         claims.put("type", "ACCESS");
 
         return Jwts.builder()
                 .claims(claims)
-                .subject(userId.toString())
+                .subject(String.valueOf(userId))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
                 .signWith(secretKey)
@@ -59,7 +50,7 @@ public class JwtUtil {
 
         return Jwts.builder()
                 .claims(claims)
-                .subject(userId.toString())
+                .subject(String.valueOf(userId))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
                 .signWith(secretKey)
@@ -73,19 +64,16 @@ public class JwtUtil {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-        } catch (io.jsonwebtoken.security.SecurityException | io.jsonwebtoken.MalformedJwtException | 
-                 io.jsonwebtoken.ExpiredJwtException | io.jsonwebtoken.UnsupportedJwtException | 
-                 IllegalArgumentException e) {
-            logger.debug("JWT 토큰 파싱 실패: {}", e.getMessage());
-            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("유효하지 않은 토큰입니다: " + e.getMessage());
         }
     }
 
     public Long extractUserId(String token) {
         Claims claims = extractClaims(token);
         Object userId = claims.get("userId");
-        if (userId instanceof Number number) {
-            return number.longValue();
+        if (userId instanceof Number) {
+            return ((Number) userId).longValue();
         }
         return Long.parseLong(claims.getSubject());
     }
@@ -100,14 +88,10 @@ public class JwtUtil {
         return (String) claims.get("type");
     }
 
-    public boolean isTokenExpired(Claims claims) {
-        return claims.getExpiration().before(new Date());
-    }
-
     public boolean isTokenExpired(String token) {
         try {
             Claims claims = extractClaims(token);
-            return isTokenExpired(claims);
+            return claims.getExpiration().before(new Date());
         } catch (Exception e) {
             return true;
         }
@@ -117,20 +101,13 @@ public class JwtUtil {
         try {
             Claims claims = extractClaims(token);
             String type = (String) claims.get("type");
-            return type != null && type.equals(expectedType) && !isTokenExpired(claims);
+            return type != null && type.equals(expectedType) && !isTokenExpired(token);
         } catch (Exception e) {
             return false;
         }
     }
 
-    public LocalDateTime getTokenExpirationAsLocalDateTime(String token) {
-        try {
-            Claims claims = extractClaims(token);
-            Date expiration = claims.getExpiration();
-            return LocalDateTime.ofInstant(expiration.toInstant(), ZoneId.systemDefault());
-        } catch (Exception e) {
-            logger.debug("토큰 만료 시간을 가져올 수 없습니다: {}", e.getMessage());
-            throw new IllegalArgumentException(ErrorMessages.INVALID_TOKEN);
-        }
+    public String generateAccessToken(Long id) {
+        return generateAccessToken(id, "USER");
     }
 }
