@@ -1,16 +1,17 @@
 package com.trillion.server.users.controller;
 
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trillion.server.common.exception.SuccessResponse;
-import com.trillion.server.users.dto.UserResponse;
 import com.trillion.server.users.entity.UserEntity;
+import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.users.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
+    private final JwtUtil jwtUtil;
 
     @Operation(summary = "내 정보 조회", description = "현재 로그인한 사용자의 정보를 조회합니다.")
     @ApiResponses(value = {
@@ -40,19 +42,9 @@ public class UserController {
                 examples = @ExampleObject(
                     value = """
                         {
-                          "success": true,
-                          "data": {
-                            "userId": 1,
-                            "kakaoId": "123456789",
-                            "nickname": "홍길동",
-                            "profileImageUrl": "https://k.kakaocdn.net/dn/example/profile.jpg",
-                            "thumbnailImageUrl": "https://k.kakaocdn.net/dn/example/thumb.jpg",
-                            "role": "USER",
-                            "status": "ACTIVE",
-                            "lastLoginAt": "2024-01-08T10:30:00",
-                            "createdAt": "2024-01-01T00:00:00",
-                            "updatedAt": "2024-01-08T10:30:00"
-                          }
+                          "userId": 1,
+                          "kakaoId": "123456789",
+                          "nickname": "홍길동",
                         }
                         """
                 )
@@ -62,25 +54,26 @@ public class UserController {
         @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
     })
     @GetMapping("/me")
-    public ResponseEntity<SuccessResponse<UserResponse>> getCurrentUser(
-            @AuthenticationPrincipal Long userId) {
+    public ResponseEntity<Map<String, Object>> getCurrentUser(
+            @CookieValue(value = "accessToken", required = false) String accessToken) {
         
+        if (accessToken == null || accessToken.isEmpty()) {
+            throw new IllegalArgumentException("인증 토큰이 필요합니다.");
+        }
+        
+        if (!jwtUtil.validateToken(accessToken, "ACCESS")) {
+            throw new IllegalArgumentException("유효하지 않은 토큰입니다.");
+        }
+        
+        Long userId = jwtUtil.extractUserId(accessToken);
         UserEntity user = userService.getCurrentUser(userId);
         
-        UserResponse userResponse = UserResponse.builder()
-                .userId(user.getId())
-                .kakaoId(user.getKakaoId())
-                .nickname(user.getNickname())
-                .profileImageUrl(user.getProfileImageUrl())
-                .thumbnailImageUrl(user.getThumbnailImageUrl())
-                .role(user.getRole().name())
-                .status(user.getStatus().name())
-                .lastLoginAt(user.getLastLoginAt())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
+        Map<String, Object> result = new HashMap<>();
+        result.put("userId", user.getId());
+        result.put("kakaoId", user.getKakaoId());
+        result.put("nickname", user.getNickname());
         
-        return ResponseEntity.ok(SuccessResponse.of(userResponse));
+        return ResponseEntity.ok(result);
     }
 
     @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 탈퇴 처리합니다.")
@@ -90,20 +83,32 @@ public class UserController {
         @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
     })
     @DeleteMapping("/me")
-    public ResponseEntity<SuccessResponse<Void>> deleteAccount(
-            @AuthenticationPrincipal Long userId,
+    public ResponseEntity<Map<String, Object>> deleteAccount(
+            @CookieValue(value = "accessToken", required = false) String accessToken,
             HttpServletResponse response) {
         
+        if (accessToken == null || accessToken.isEmpty()) {
+            throw new IllegalArgumentException("인증 토큰이 필요합니다.");
+        }
+        
+        if (!jwtUtil.validateToken(accessToken, "ACCESS")) {
+            throw new IllegalArgumentException("유효하지 않은 토큰입니다.");
+        }
+        
+        Long userId = jwtUtil.extractUserId(accessToken);
         userService.deleteAccount(userId);
         
         deleteTokenCookies(response);
         
-        return ResponseEntity.ok(SuccessResponse.of("회원 탈퇴가 완료되었습니다."));
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "회원 탈퇴가 완료되었습니다.");
+        
+        return ResponseEntity.ok(result);
     }
     
     private void deleteTokenCookies(HttpServletResponse response) {
         response.addHeader("Set-Cookie", "accessToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
         response.addHeader("Set-Cookie", "refreshToken=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
-        response.addHeader("Set-Cookie", "isSignin=; Path=/; Max-Age=0; SameSite=Lax");
     }
 }
