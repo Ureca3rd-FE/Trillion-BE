@@ -1,25 +1,14 @@
 package com.trillion.server.common.config;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,34 +16,15 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class CookieOAuth2AuthorizationRequestRepository implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 
-    private static final Logger logger = LoggerFactory.getLogger(CookieOAuth2AuthorizationRequestRepository.class);
     private static final String OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME = "oauth2_auth_request";
     private static final String REDIRECT_URI_PARAM_COOKIE_NAME = "redirect_uri";
     private static final int COOKIE_EXPIRE_SECONDS = 180;
-    private static final String HMAC_ALGORITHM = "HmacSHA256";
-    private static final String SIGNATURE_SEPARATOR = ".";
-
-    private final boolean cookieSecure;
-    private final String hmacSecret;
-    private final ObjectMapper objectMapper;
-    private final Set<String> allowedRedirectUris;
-
-    public CookieOAuth2AuthorizationRequestRepository(
-            boolean cookieSecure, 
-            String hmacSecret, 
-            ObjectMapper objectMapper,
-            Set<String> allowedRedirectUris) {
-        this.cookieSecure = cookieSecure;
-        this.hmacSecret = hmacSecret;
-        this.objectMapper = objectMapper;
-        this.allowedRedirectUris = allowedRedirectUris != null ? allowedRedirectUris : Set.of();
-    }
 
     @Override
     public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
         Cookie cookie = getCookie(request, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME);
         if (cookie != null) {
-            return deserialize(cookie);
+            return deserialize(cookie, OAuth2AuthorizationRequest.class);
         }
         return null;
     }
@@ -75,13 +45,7 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
         
         String redirectUriAfterLogin = request.getParameter(REDIRECT_URI_PARAM_COOKIE_NAME);
         if (redirectUriAfterLogin != null && !redirectUriAfterLogin.isBlank()) {
-            if (isValidRedirectUri(redirectUriAfterLogin)) {
-                String encodedRedirectUri = Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(redirectUriAfterLogin.getBytes(StandardCharsets.UTF_8));
-                addCookie(response, REDIRECT_URI_PARAM_COOKIE_NAME, encodedRedirectUri, COOKIE_EXPIRE_SECONDS);
-            } else {
-                logger.warn("허용되지 않은 redirect_uri: {}", redirectUriAfterLogin);
-            }
+            addCookie(response, REDIRECT_URI_PARAM_COOKIE_NAME, redirectUriAfterLogin, COOKIE_EXPIRE_SECONDS);
         }
     }
 
@@ -105,7 +69,7 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
         cookie.setPath("/");
         cookie.setHttpOnly(true);
         cookie.setMaxAge(maxAge);
-        cookie.setSecure(cookieSecure);
+        cookie.setSecure(false);
         response.addCookie(cookie);
     }
 
@@ -116,7 +80,6 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
             cookie.setPath("/");
             cookie.setMaxAge(0);
             cookie.setHttpOnly(true);
-            cookie.setSecure(cookieSecure);
             response.addCookie(cookie);
         }
     }
@@ -137,213 +100,26 @@ public class CookieOAuth2AuthorizationRequestRepository implements Authorization
         return null;
     }
 
-    private String serialize(OAuth2AuthorizationRequest request) {
-        try {
-            Map<String, Object> data = new HashMap<>();
-            data.put("authorizationUri", request.getAuthorizationUri());
-            data.put("clientId", request.getClientId());
-            data.put("redirectUri", request.getRedirectUri());
-            if (request.getScopes() != null) {
-                data.put("scopes", request.getScopes());
-            }
-            data.put("state", request.getState());
-            if (request.getAdditionalParameters() != null && !request.getAdditionalParameters().isEmpty()) {
-                data.put("additionalParameters", request.getAdditionalParameters());
-            }
-            if (request.getAuthorizationRequestUri() != null) {
-                data.put("authorizationRequestUri", request.getAuthorizationRequestUri());
-            }
-            if (request.getAttributes() != null && !request.getAttributes().isEmpty()) {
-                data.put("attributes", request.getAttributes());
-            }
-
-            String json = objectMapper.writeValueAsString(data);
-            String signature = calculateHmac(json);
-            String signedData = json + SIGNATURE_SEPARATOR + signature;
-            
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(
-                signedData.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            logger.error("OAuth2AuthorizationRequest 직렬화 실패", e);
+    private String serialize(Object object) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(object);
+            return Base64.getUrlEncoder().encodeToString(baos.toByteArray());
+        } catch (IOException e) {
             return null;
         }
     }
 
-    private OAuth2AuthorizationRequest deserialize(Cookie cookie) {
+    private <T> T deserialize(Cookie cookie, Class<T> clazz) {
         try {
-            String signedData = new String(
-                Base64.getUrlDecoder().decode(cookie.getValue()), 
-                StandardCharsets.UTF_8);
-            
-            int separatorIndex = signedData.lastIndexOf(SIGNATURE_SEPARATOR);
-            if (separatorIndex == -1) {
-                logger.warn("서명이 없는 쿠키 데이터");
-                return null;
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(cookie.getValue());
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(decodedBytes);
+                 ObjectInputStream ois = new ObjectInputStream(bais)) {
+                Object deserialized = ois.readObject();
+                return clazz.cast(deserialized);
             }
-
-            String json = signedData.substring(0, separatorIndex);
-            String signature = signedData.substring(separatorIndex + 1);
-
-            if (!verifyHmac(json, signature)) {
-                logger.warn("쿠키 서명 검증 실패");
-                return null;
-            }
-
-            Map<String, Object> data = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-            
-            OAuth2AuthorizationRequest.Builder builder = OAuth2AuthorizationRequest.authorizationCode()
-                .authorizationUri((String) data.get("authorizationUri"))
-                .clientId((String) data.get("clientId"))
-                .redirectUri((String) data.get("redirectUri"))
-                .state((String) data.get("state"));
-            
-            if (data.containsKey("scopes")) {
-                Object scopesObj = data.get("scopes");
-                if (scopesObj != null) {
-                    java.util.Set<String> scopes;
-                    if (scopesObj instanceof java.util.Set) {
-                        @SuppressWarnings("unchecked")
-                        java.util.Set<String> setScopes = (java.util.Set<String>) scopesObj;
-                        scopes = setScopes;
-                    } else if (scopesObj instanceof java.util.List) {
-                        @SuppressWarnings("unchecked")
-                        java.util.List<String> listScopes = (java.util.List<String>) scopesObj;
-                        scopes = new java.util.HashSet<>(listScopes);
-                    } else {
-                        logger.warn("예상치 못한 scopes 타입: {}", scopesObj.getClass());
-                        scopes = java.util.Collections.emptySet();
-                    }
-                    builder.scopes(scopes);
-                }
-            }
-            
-            if (data.containsKey("additionalParameters")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> additionalParameters = (Map<String, Object>) data.get("additionalParameters");
-                if (additionalParameters != null && !additionalParameters.isEmpty()) {
-                    builder.additionalParameters(additionalParameters);
-                }
-            }
-            
-            if (data.containsKey("authorizationRequestUri")) {
-                builder.authorizationRequestUri((String) data.get("authorizationRequestUri"));
-            }
-            
-            if (data.containsKey("attributes")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> attributes = (Map<String, Object>) data.get("attributes");
-                if (attributes != null && !attributes.isEmpty()) {
-                    builder.attributes(attributes);
-                }
-            }
-            
-            return builder.build();
-        } catch (Exception e) {
-            logger.error("OAuth2AuthorizationRequest 역직렬화 실패", e);
+        } catch (IOException | ClassNotFoundException | ClassCastException | IllegalArgumentException e) {
             return null;
         }
-    }
-
-    private String calculateHmac(String data) {
-        try {
-            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            SecretKeySpec secretKeySpec = new SecretKeySpec(
-                hmacSecret.getBytes(StandardCharsets.UTF_8), 
-                HMAC_ALGORITHM);
-            mac.init(secretKeySpec);
-            byte[] hmacBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(hmacBytes);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            logger.error("HMAC 계산 실패", e);
-            throw new RuntimeException("HMAC 계산 실패", e);
-        }
-    }
-
-    private boolean verifyHmac(String data, String signature) {
-        String calculatedSignature = calculateHmac(data);
-        return calculatedSignature.equals(signature);
-    }
-
-    private boolean isValidRedirectUri(String redirectUri) {
-        if (redirectUri == null || redirectUri.isBlank()) {
-            return false;
-        }
-
-        try {
-            URI uri = new URI(redirectUri);
-            String scheme = uri.getScheme();
-            String host = uri.getHost();
-            
-            if (scheme == null || host == null) {
-                return false;
-            }
-
-            if (!"http".equals(scheme) && !"https".equals(scheme)) {
-                logger.warn("허용되지 않은 스킴: {}", scheme);
-                return false;
-            }
-
-            if (allowedRedirectUris.isEmpty()) {
-                logger.warn("허용된 redirect URI 목록이 비어있습니다. 모든 URI가 거부됩니다.");
-                return false;
-            }
-
-            String normalizedUri = normalizeUri(uri);
-            boolean isValid = allowedRedirectUris.stream()
-                .anyMatch(allowed -> {
-                    try {
-                        URI allowedUri = new URI(allowed);
-                        String normalizedAllowed = normalizeUri(allowedUri);
-                        return normalizedUri.equals(normalizedAllowed) || 
-                               (normalizedAllowed.endsWith("/") && normalizedUri.startsWith(normalizedAllowed)) ||
-                               (!normalizedAllowed.endsWith("/") && normalizedUri.startsWith(normalizedAllowed + "/"));
-                    } catch (URISyntaxException e) {
-                        logger.warn("허용된 redirect URI 파싱 실패: {}", allowed, e);
-                        return false;
-                    }
-                });
-
-            if (!isValid) {
-                logger.warn("허용되지 않은 redirect URI: {} (허용 목록: {})", redirectUri, allowedRedirectUris);
-            }
-
-            return isValid;
-        } catch (URISyntaxException e) {
-            logger.warn("잘못된 redirect URI 형식: {}", redirectUri, e);
-            return false;
-        }
-    }
-
-    private String normalizeUri(URI uri) {
-        String scheme = uri.getScheme();
-        String host = uri.getHost();
-        int port = uri.getPort();
-        String path = uri.getPath() != null ? uri.getPath() : "/";
-        
-        if (port == -1) {
-            return String.format("%s://%s%s", scheme, host, path);
-        } else {
-            return String.format("%s://%s:%d%s", scheme, host, port, path);
-        }
-    }
-
-    public String getRedirectUri(HttpServletRequest request) {
-        Cookie cookie = getCookie(request, REDIRECT_URI_PARAM_COOKIE_NAME);
-        if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
-            try {
-                String decodedUri = new String(
-                    Base64.getUrlDecoder().decode(cookie.getValue()),
-                    StandardCharsets.UTF_8);
-                
-                if (isValidRedirectUri(decodedUri)) {
-                    return decodedUri;
-                } else {
-                    logger.warn("쿠키에서 읽은 redirect_uri가 유효하지 않음: {}", decodedUri);
-                }
-            } catch (IllegalArgumentException e) {
-                logger.warn("쿠키의 redirect_uri 디코딩 실패", e);
-            }
-        }
-        return null;
     }
 }
