@@ -1,9 +1,7 @@
 package com.trillion.server.common.config;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 import com.trillion.server.auth.filter.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,8 +11,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
-import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
@@ -45,6 +41,15 @@ public class SecurityConfig {
     @Value("${jwt.refresh-token-expiration:604800000}")
     private long refreshTokenExpiration;
 
+    @Value("${app.cookie.secure}")
+    private boolean cookieSecure;
+
+    @Value("${app.oauth2.hmac-secret}")
+    private String cookieHmacKey;
+
+    @Value("#{'${app.oauth2.allowed-redirect-uris}'.split(',')}")
+    private Set<String> allowedRedirectUris;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -70,7 +75,7 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(authorization -> authorization
-                    .authorizationRequestRepository(authorizationRequestRepository())
+                    .authorizationRequestRepository(cookieAuthorizationRequestRepository())
                     .baseUri("/oauth2/authorization")
                 )
                 .redirectionEndpoint(redirection -> redirection
@@ -82,6 +87,16 @@ public class SecurityConfig {
 
 
         return http.build();
+    }
+
+    @Bean
+    public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository() {
+        return new CookieOAuth2AuthorizationRequestRepository(
+                cookieSecure,
+                cookieHmacKey,
+                objectMapper,
+                allowedRedirectUris
+        );
     }
 
     @Bean
@@ -154,7 +169,13 @@ public class SecurityConfig {
         if (cookies != null) {
             for (jakarta.servlet.http.Cookie cookie : cookies) {
                 if ("redirect_uri".equals(cookie.getName())) {
-                    return cookie.getValue();
+                    String encodedUri = cookie.getValue();
+                    try {
+                        byte[] decodedBytes = Base64.getUrlDecoder().decode(encodedUri);
+                        return new String(decodedBytes, StandardCharsets.UTF_8);
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
                 }
             }
         }
@@ -166,7 +187,7 @@ public class SecurityConfig {
                 .path("/")
                 .sameSite("Lax")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .maxAge(maxAge)
                 .build();
 
@@ -190,12 +211,8 @@ public class SecurityConfig {
         try {
             objectMapper.writeValue(response.getWriter(), responseBody);
         } catch (java.io.IOException e) {
+            e.printStackTrace();
         }
-    }
-
-    @Bean
-    public AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository() {
-        return new CookieOAuth2AuthorizationRequestRepository();
     }
 
     @Bean
