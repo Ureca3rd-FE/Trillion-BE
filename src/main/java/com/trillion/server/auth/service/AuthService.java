@@ -1,6 +1,5 @@
 package com.trillion.server.auth.service;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import com.trillion.server.auth.dto.AuthDto;
@@ -35,7 +34,10 @@ public class AuthService {
             Object profileObj = kakaoAccount.get("profile");
 
             if (profileObj instanceof Map<?, ?> profile) {
-                nickname = (String) profile.getOrDefault("nickname", nickname);
+                Object nicknameObj = profile.get("nickname");
+                if(nicknameObj instanceof String){
+                    nickname = (String) nicknameObj;
+                }
             }
         }
 
@@ -49,7 +51,6 @@ public class AuthService {
 
         String accessToken = jwtUtil.generateAccessToken(user.getId());
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
-        user.updateRefreshToken(refreshToken);
         
         user.updateRefreshToken(refreshToken);
         
@@ -88,7 +89,7 @@ public class AuthService {
     @Transactional
     public void logout(Long userId){
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         user.updateRefreshToken(null);
     }
