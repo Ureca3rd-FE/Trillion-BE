@@ -8,7 +8,8 @@ public class AuthDto {
             Long userId,
             String accessToken,
             String refreshToken,
-            String nickname
+            String nickname,
+            boolean isNewUser
     ) {}
 
     @Builder

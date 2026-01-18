@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.trillion.server.auth.dto.AuthDto;
 import com.trillion.server.common.exception.ErrorMessages;
+import com.trillion.server.users.entity.Role;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
@@ -41,13 +42,22 @@ public class AuthService {
             }
         }
 
-        String finalNickname = nickname;
-        
-        UserEntity user = userRepository.findByKakaoId(kakaoId)
-                .orElseGet(() -> userRepository.save(UserEntity.builder()
-                                .kakaoId(kakaoId)
-                                .nickname(finalNickname)
-                                .build()));
+        UserEntity user = userRepository.findByKakaoId(kakaoId).orElse(null);
+        boolean isNewUser = false;
+
+        if(user == null){
+            user = UserEntity.builder()
+                    .kakaoId(kakaoId)
+                    .nickname(nickname)
+                    .role(Role.GUEST)
+                    .build();
+            userRepository.save(user);
+            isNewUser = true;
+        }else{
+            if(user.getRole() == Role.GUEST){
+                isNewUser = true;
+            }
+        }
 
         String accessToken = jwtUtil.generateAccessToken(user.getId());
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
@@ -59,6 +69,7 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .nickname(user.getNickname())
+                .isNewUser(isNewUser)
                 .build();
     }
 

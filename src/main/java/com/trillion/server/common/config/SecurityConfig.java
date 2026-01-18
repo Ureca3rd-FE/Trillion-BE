@@ -122,22 +122,13 @@ public class SecurityConfig {
             
             addTokenCookie(response, "accessToken", accessToken, accessTokenMaxAge);
             addTokenCookie(response, "refreshToken", refreshToken, refreshTokenMaxAge);
-            
-            String redirectUri = getRedirectUriFromCookie(request);
-            
-            if (redirectUri != null && !redirectUri.isBlank()) {
-                String redirectUrl = redirectUri + "?success=true";
-                response.sendRedirect(redirectUrl);
-            } else {
-                Map<String, Object> responseBody = new HashMap<>();
-                responseBody.put("success", true);
-                responseBody.put("message", "로그인 성공");
-                responseBody.put("data", loginResponse);
 
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                response.setCharacterEncoding("UTF-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                objectMapper.writeValue(response.getWriter(), responseBody);
+            String frontUrl ="http://localhost:3000";
+
+            if(loginResponse.isNewUser()){
+                response.sendRedirect(frontUrl + "/agree");
+            }else{
+                response.sendRedirect(frontUrl + "/home");
             }
         };
     }
