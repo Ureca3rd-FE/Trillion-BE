@@ -38,7 +38,7 @@ public class UserEntity {
         this.role = role;
     }
 
-    public void upgradToUser(){
+    public void upgradeToUser(){
         this.role = Role.USER;
     }
 

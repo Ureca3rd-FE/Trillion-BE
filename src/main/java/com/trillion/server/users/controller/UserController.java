@@ -55,6 +55,19 @@ public class UserController {
         ));
     }
 
+    @PostMapping("/agree")
+    public ResponseEntity<SuccessResponse<Void>> signUp(
+            @CookieValue(value = "accessToken", required = false) String accessToken) {
+
+        validateToken(accessToken);
+
+        Long userId = jwtUtil.extractUserId(accessToken);
+
+        userService.signUpUser(userId);
+
+        return ResponseEntity.ok(SuccessResponse.of(SuccessMessages.SIGNUP_SUCCESS));
+    }
+
     @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 계정을 탈퇴처리")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "회원 탈퇴 성공"),

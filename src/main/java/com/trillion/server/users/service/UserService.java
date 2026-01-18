@@ -2,6 +2,7 @@ package com.trillion.server.users.service;
 
 import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.util.JwtUtil;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,5 +38,13 @@ public class UserService {
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         userRepository.delete(user);
+    }
+
+    @Transactional
+    public void signUpUser(Long userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
+
+        user.upgradeToUser();
     }
 }
