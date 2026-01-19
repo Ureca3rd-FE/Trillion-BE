@@ -55,7 +55,7 @@ public class UserController {
         ));
     }
 
-    @PostMapping("/agree")
+    @PostMapping("/auth/logincheck")
     public ResponseEntity<SuccessResponse<Void>> signUp(
             @CookieValue(value = "accessToken", required = false) String accessToken) {
 

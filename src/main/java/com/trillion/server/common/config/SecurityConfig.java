@@ -126,9 +126,9 @@ public class SecurityConfig {
             String frontUrl ="http://localhost:3000";
 
             if(loginResponse.isNewUser()){
-                response.sendRedirect(frontUrl + "/agree");
+                response.sendRedirect(frontUrl + "/auth/logincheck");
             }else{
-                response.sendRedirect(frontUrl + "/home");
+                response.sendRedirect(frontUrl + "/");
             }
         };
     }
