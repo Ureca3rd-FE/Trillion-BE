@@ -6,12 +6,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trillion.server.counsel.entity.CounselEntity;
 import com.trillion.server.counsel.entity.CounselStatus;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import java.time.format.DateTimeFormatter;
 
 public class CounselDto {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
     private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Builder
+    public record CounselCreateRequest(
+            @NotBlank(message = "yyyy.mm.dd")
+            String date,
+
+            @NotBlank(message = "상담 내용을 입력하세요.")
+            String content
+    ) {}
 
     @Builder
     public record CounselListResponse(

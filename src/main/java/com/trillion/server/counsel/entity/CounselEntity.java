@@ -62,7 +62,7 @@ public class CounselEntity {
         this.summaryJson = summaryJson;
         this.status = CounselStatus.COMPLETED;
     }
-
+    
     public void failSummary() {
         this.status = CounselStatus.FAILED;
     }
