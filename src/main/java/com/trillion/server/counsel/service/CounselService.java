@@ -1,7 +1,6 @@
 package com.trillion.server.counsel.service;
 
 import com.trillion.server.common.exception.ErrorMessages;
-import com.trillion.server.common.exception.SuccessMessages;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.entity.CounselEntity;
 import com.trillion.server.counsel.entity.CounselStatus;
@@ -10,7 +9,7 @@ import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -36,7 +35,7 @@ public class CounselService {
     private final UserRepository userRepository;
     private final RestTemplate restTemplate;
 
-    @Value("${ai.server.url")
+    @Value("${ai.server.url}")
     private String aiServerUrl;
 
     @Transactional
@@ -50,14 +49,15 @@ public class CounselService {
         CounselEntity counsel = CounselEntity.builder()
                 .user(user)
                 .counselDate(counselDate)
-                .content(request.content())
+                .chat(request.chat())
                 .status(CounselStatus.PENDING)
+                .createdAt(java.time.LocalDateTime.now())
                 .build();
 
         counselRepository.save(counsel);
 
         Map<String, String> aiRequest = new HashMap<>();
-        aiRequest.put("content", request.content());
+        aiRequest.put("chat", request.chat());
         aiRequest.put("date", request.date());
 
         HttpHeaders headers = new HttpHeaders();
@@ -70,7 +70,7 @@ public class CounselService {
             String aiResponseJson = restTemplate.postForObject(aiServerUrl, entity, String.class);
 
             log.info("AI 분석 성공. DB 업데이트");
-            counsel.counselAnalysis(aiResponseJson);
+            counsel.completeAnalysis(aiResponseJson);
         }catch (Exception e){
             log.error("AI 서버 통신 실패: {}", e.getMessage());
             counsel.failAnalysis();
