@@ -27,6 +27,7 @@ import com.trillion.server.auth.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Configuration
 @EnableWebSecurity
@@ -123,13 +124,22 @@ public class SecurityConfig {
             addTokenCookie(response, "accessToken", accessToken, accessTokenMaxAge);
             addTokenCookie(response, "refreshToken", refreshToken, refreshTokenMaxAge);
 
+            String targetUrl;
             String frontUrl ="http://localhost:3000";
 
             if(loginResponse.isNewUser()){
-                response.sendRedirect(frontUrl + "/auth/logincheck");
+                targetUrl = UriComponentsBuilder.fromUriString(frontUrl + "/auth/logincheck")
+                        .queryParam("accessToken", accessToken)
+                        .queryParam("refreshToken", refreshToken)
+                        .queryParam("isNewUser", true)
+                        .build().toUriString();
             }else{
-                response.sendRedirect(frontUrl + "/");
+                targetUrl = UriComponentsBuilder.fromUriString(frontUrl + "/")
+                        .queryParam("accessToken", accessToken)
+                        .queryParam("refreshToken", refreshToken)
+                        .build().toUriString();
             }
+            response.sendRedirect(targetUrl);
         };
     }
 
