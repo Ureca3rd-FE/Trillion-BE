@@ -1,8 +1,11 @@
 package com.trillion.server.auth.service;
 
-import java.util.HashMap;
 import java.util.Map;
 
+import com.trillion.server.auth.dto.AuthDto;
+import com.trillion.server.common.exception.ErrorMessages;
+import com.trillion.server.users.entity.Role;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,74 +24,84 @@ public class AuthService {
     private final JwtUtil jwtUtil;
 
     @Transactional
-    public Map<String, Object> processKakaoLogin(OAuth2User oAuth2User) {
+    public AuthDto.LoginResponse processKakaoLogin(OAuth2User oAuth2User) {
         Map<String, Object> attributes = oAuth2User.getAttributes();
 
         String kakaoId = String.valueOf(attributes.get("id"));
         String nickname = "kakaoUser";
         
         Object kakaoAccountObj = attributes.get("kakao_account");
-        if (kakaoAccountObj instanceof Map) {
-            Map<String, Object> kakaoAccount = (Map<String, Object>) kakaoAccountObj;
+        if (kakaoAccountObj instanceof Map<?, ?> kakaoAccount) {
             Object profileObj = kakaoAccount.get("profile");
 
-            if (profileObj instanceof Map) {
-                Map<String, Object> profile = (Map<String, Object>) profileObj;
-                nickname = (String) profile.getOrDefault("nickname", nickname);
+            if (profileObj instanceof Map<?, ?> profile) {
+                Object nicknameObj = profile.get("nickname");
+                if(nicknameObj instanceof String){
+                    nickname = (String) nicknameObj;
+                }
             }
         }
 
-        String finalNickname = nickname;
-        UserEntity user = userRepository.findByKakaoId(kakaoId)
-                .orElseGet(() -> userRepository.save(UserEntity.builder()
-                                .kakaoId(kakaoId)
-                                .nickname(finalNickname)
-                                .build()));
+        UserEntity user = userRepository.findByKakaoId(kakaoId).orElse(null);
+        boolean isNewUser = false;
+
+        if(user == null){
+            user = UserEntity.builder()
+                    .kakaoId(kakaoId)
+                    .nickname(nickname)
+                    .role(Role.GUEST)
+                    .build();
+            userRepository.save(user);
+            isNewUser = true;
+        }else{
+            if(user.getRole() == Role.GUEST){
+                isNewUser = true;
+            }
+        }
 
         String accessToken = jwtUtil.generateAccessToken(user.getId());
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+        
         user.updateRefreshToken(refreshToken);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("userId", user.getId());
-        result.put("kakaoId", kakaoId);
-        result.put("nickname", user.getNickname());
-        result.put("accessToken", accessToken);
-        result.put("refreshToken", refreshToken);
-        
-        return result;
+        return AuthDto.LoginResponse.builder()
+                .userId(user.getId())
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .nickname(user.getNickname())
+                .isNewUser(isNewUser)
+                .build();
     }
 
     @Transactional
-    public Map<String, Object> refreshTokens(String refreshToken) {
+    public AuthDto.RefreshTokenResponse refreshTokens(String refreshToken) {
         if (!jwtUtil.validateToken(refreshToken, "REFRESH")) {
-            throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
+            throw new IllegalArgumentException(ErrorMessages.INVALID_REFRESH_TOKEN);
         }
         
         Long userId = jwtUtil.extractUserId(refreshToken);
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("시용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
+        
         if(user.getRefreshToken() == null || !user.getRefreshToken().equals(refreshToken)){
-            throw new IllegalArgumentException("유효하지 않거나 만료된 리프레시 토큰입니다. 다시 로그인 해주세요.");
+            throw new IllegalArgumentException(ErrorMessages.INVALID_REFRESH_TOKEN);
         }
 
         String newAccessToken = jwtUtil.generateAccessToken(userId);
         String newRefreshToken = jwtUtil.generateRefreshToken(userId);
         user.updateRefreshToken(newRefreshToken);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("accessToken", newAccessToken);
-        result.put("refreshToken", newRefreshToken);
-        
-        return result;
+        return AuthDto.RefreshTokenResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .build();
     }
 
     @Transactional
     public void logout(Long userId){
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         user.updateRefreshToken(null);
-        userRepository.save(user);
     }
 }

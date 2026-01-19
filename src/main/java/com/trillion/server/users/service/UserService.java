@@ -1,6 +1,8 @@
 package com.trillion.server.users.service;
 
+import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.util.JwtUtil;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,50 +20,31 @@ public class UserService {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
 
+    @Transactional(readOnly = true)
     public UserEntity getCurrentUser(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("사용자 ID가 필요합니다.");
+            throw new IllegalArgumentException(ErrorMessages.USER_ID_REQUIRED);
         }
         return userRepository.findById(userId)
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
     }
 
     @Transactional
     public void deleteAccount(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("사용자 ID가 필요합니다.");
+            throw new IllegalArgumentException(ErrorMessages.USER_ID_REQUIRED);
         }
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
-        userRepository.save(user);
+        userRepository.delete(user);
     }
 
     @Transactional
-    public Map<String, Object> processKakaoLogin(OAuth2User oAuth2User){
-        Map<String, Object> parsing = oAuth2User.getAttributes();
-        String kakaoId = String.valueOf(parsing.get("id"));
-        Map<String, Object> kakaoAccount = (Map<String, Object>) parsing.get("kakao_account");
-        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
-        String nickname = (String) profile.get("nickname");
+    public void signUpUser(Long userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
-        UserEntity user = userRepository.findByKakaoId(kakaoId)
-                .orElseGet(() -> {
-                    UserEntity newUser = UserEntity.builder()
-                            .kakaoId(kakaoId)
-                            .nickname(nickname)
-                            .build();
-                    return userRepository.save(newUser);
-                });
-
-        String accessToken = jwtUtil.generateAccessToken(user.getId());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
-
-        user.updateRefreshToken(refreshToken);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("accessToken", accessToken);
-        result.put("refreshToken", refreshToken);
-        return result;
+        user.upgradeToUser();
     }
 }

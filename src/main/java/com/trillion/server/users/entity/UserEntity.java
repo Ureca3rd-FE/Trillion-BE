@@ -1,12 +1,6 @@
 package com.trillion.server.users.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -33,10 +27,19 @@ public class UserEntity {
     @Column(name = "refresh_token", length = 500)
     private String refreshToken;
 
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
     @Builder
-    public UserEntity(String kakaoId, String nickname) {
+    public UserEntity(String kakaoId, String nickname, Role role) {
         this.kakaoId = kakaoId;
         this.nickname = nickname;
+        this.role = role;
+    }
+
+    public void upgradeToUser(){
+        this.role = Role.USER;
     }
 
     public void updateRefreshToken(String refreshToken){
