@@ -1,6 +1,5 @@
 package com.trillion.server.counsel.entity;
 
-import com.trillion.server.counsel.entity.CounselStatus;
 import com.trillion.server.users.entity.UserEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -34,7 +33,7 @@ public class CounselEntity {
     private String title;
 
     @Column(columnDefinition = "TEXT", nullable = false)
-    private String content;
+    private String chat;
 
     @Column(name = "summary_json", columnDefinition = "json")
     private String summaryJson;
@@ -48,13 +47,14 @@ public class CounselEntity {
     private LocalDateTime createdAt;
 
     @Builder
-    public CounselEntity(UserEntity user, LocalDate counselDate, String content, String title, String summaryJson, CounselStatus status) {
+    public CounselEntity(UserEntity user, LocalDate counselDate, String chat, String title, String summaryJson, CounselStatus status, LocalDateTime createdAt) {
         this.user = user;
         this.counselDate = counselDate;
-        this.content = content;
+        this.chat = chat;
         this.title = title;
         this.summaryJson = summaryJson;
         this.status = status != null ? status : CounselStatus.PENDING;
+        this.createdAt = createdAt;
     }
 
     public void completeSummary(String title, String summaryJson) {
@@ -64,6 +64,15 @@ public class CounselEntity {
     }
     
     public void failSummary() {
+        this.status = CounselStatus.FAILED;
+    }
+
+    public void completeAnalysis(String summaryJson){
+        this.summaryJson = summaryJson;
+        this.status = CounselStatus.COMPLETED;
+    }
+
+    public void failAnalysis(){
         this.status = CounselStatus.FAILED;
     }
 }

@@ -20,7 +20,7 @@ public class CounselDto {
             String date,
 
             @NotBlank(message = "상담 내용을 입력하세요.")
-            String content
+            String chat
     ) {}
 
     @Builder
@@ -48,7 +48,7 @@ public class CounselDto {
             String title,
             String counselDate,
             CounselStatus status,
-            String content,
+            String chat,
 
             @JsonRawValue
             String summaryJson,
@@ -61,7 +61,7 @@ public class CounselDto {
                     .title(entity.getTitle())
                     .counselDate(entity.getCounselDate() != null ? entity.getCounselDate().format(DATE_FORMATTER) : "")
                     .status(entity.getStatus())
-                    .content(entity.getContent())
+                    .chat(entity.getChat())
                     .summaryJson(entity.getSummaryJson())
                     .createdAt(entity.getCreatedAt().format(DATE_FORMATTER))
                     .build();
