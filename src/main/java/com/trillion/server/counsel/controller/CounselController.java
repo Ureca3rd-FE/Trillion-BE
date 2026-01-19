@@ -18,6 +18,8 @@ public class CounselController {
     private final CounselService counselService;
     private final JwtUtil jwtUtil;
 
+
+
     @GetMapping
     public ResponseEntity<SuccessResponse<List<CounselDto.CounselListResponse>>> getCounselList(
         @CookieValue(value = "accessToken", required = false) String accessToken){
