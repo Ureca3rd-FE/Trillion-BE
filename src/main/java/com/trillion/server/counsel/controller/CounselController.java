@@ -1,5 +1,7 @@
 package com.trillion.server.counsel.controller;
 
+import com.trillion.server.common.exception.ErrorMessages;
+import com.trillion.server.common.exception.SuccessMessages;
 import com.trillion.server.common.exception.SuccessResponse;
 import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.counsel.dto.CounselDto;
@@ -18,8 +20,6 @@ public class CounselController {
     private final CounselService counselService;
     private final JwtUtil jwtUtil;
 
-
-
     @GetMapping
     public ResponseEntity<SuccessResponse<List<CounselDto.CounselListResponse>>> getCounselList(
         @CookieValue(value = "accessToken", required = false) String accessToken){
@@ -28,6 +28,21 @@ public class CounselController {
         List<CounselDto.CounselListResponse> responses = counselService.getCounselList(userId);
 
         return ResponseEntity.ok(SuccessResponse.of(responses));
+    }
+
+    @PostMapping("/write")
+    public ResponseEntity<SuccessResponse<Void>> createCounsel(
+            @CookieValue(value = "accessToken", required = false) String accessToken,
+            @RequestBody CounselDto.CounselCreateRequest request){
+
+        if(accessToken == null || accessToken.isEmpty()){
+            throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
+        }
+
+        Long userId = jwtUtil.extractUserId(accessToken);
+        counselService.createCounsel(userId, request);
+
+        return ResponseEntity.ok(SuccessResponse.of(SuccessMessages.COUNSEL_CREATE_SUCCESS));
     }
 
     @GetMapping("/{counselId}")
