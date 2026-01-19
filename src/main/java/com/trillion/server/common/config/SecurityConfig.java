@@ -3,6 +3,7 @@ package com.trillion.server.common.config;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import com.trillion.server.auth.dto.AuthDto;
 import com.trillion.server.auth.filter.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +27,7 @@ import com.trillion.server.auth.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Configuration
 @EnableWebSecurity
@@ -66,9 +68,16 @@ public class SecurityConfig {
 
             .exceptionHandling(exception -> exception
                     .authenticationEntryPoint((request, response, authException) -> {
-                        response.setContentType("application/json;charset=UTF-8");
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        response.setCharacterEncoding("UTF-8");
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        response.getWriter().write("{\"success\": false, \"message\": \"인증되지 않은 사용자입니다.\", \"error\": \"UNAUTHORIZED\"}");
+
+                        Map<String, Object> body = new HashMap<>();
+                        body.put("success", false);
+                        body.put("message", "인증되지 않은 사용자입니다.");
+                        body.put("error", "UNAUTHORIZED");
+
+                        objectMapper.writeValue(response.getWriter(), body);
                     })
             )
 
@@ -103,33 +112,34 @@ public class SecurityConfig {
     public AuthenticationSuccessHandler oauth2LoginSuccessHandler() {
         return (request, response, authentication) -> {
             OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-            Map<String, Object> result = authService.processKakaoLogin(oAuth2User);
+
+            AuthDto.LoginResponse loginResponse = authService.processKakaoLogin(oAuth2User);
             
-            String accessToken = (String) result.get("accessToken");
-            String refreshToken = (String) result.get("refreshToken");
-            
+            String accessToken = loginResponse.accessToken();
+            String refreshToken = loginResponse.refreshToken();
+
             int accessTokenMaxAge = (int) (accessTokenExpiration / 1000);
             int refreshTokenMaxAge = (int) (refreshTokenExpiration / 1000);
             
             addTokenCookie(response, "accessToken", accessToken, accessTokenMaxAge);
             addTokenCookie(response, "refreshToken", refreshToken, refreshTokenMaxAge);
-            
-            String redirectUri = getRedirectUriFromCookie(request);
-            
-            if (redirectUri != null && !redirectUri.isBlank()) {
-                String redirectUrl = redirectUri + "?success=true";
-                response.sendRedirect(redirectUrl);
-            } else {
-                Map<String, Object> responseBody = new HashMap<>();
-                responseBody.put("success", true);
-                responseBody.put("message", "로그인 성공");
-                responseBody.putAll(result);
 
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                response.setCharacterEncoding("UTF-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                objectMapper.writeValue(response.getWriter(), responseBody);
+            String targetUrl;
+            String frontUrl ="http://localhost:3000";
+
+            if(loginResponse.isNewUser()){
+                targetUrl = UriComponentsBuilder.fromUriString(frontUrl + "/auth/logincheck")
+                        .queryParam("accessToken", accessToken)
+                        .queryParam("refreshToken", refreshToken)
+                        .queryParam("isNewUser", true)
+                        .build().toUriString();
+            }else{
+                targetUrl = UriComponentsBuilder.fromUriString(frontUrl + "/")
+                        .queryParam("accessToken", accessToken)
+                        .queryParam("refreshToken", refreshToken)
+                        .build().toUriString();
             }
+            response.sendRedirect(targetUrl);
         };
     }
 
