@@ -12,8 +12,24 @@ services:
       MYSQL_USER: ${MARIADB_USER}
       MYSQL_PASSWORD: ${MARIADB_PASSWORD}
     command:
-      --character-set-server=utf8mb4 
+      --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
     volumes:
       - ./db_data:/var/lib/mysql
       - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+
+  trillion-ai:
+    build:
+      context: ../Trillion-AI
+      dockerfile: Dockerfile
+    container_name: trillionAI
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - PYTHONUNBUFFERED=1
+
+# 배포시, spring-app 따로 작성 필요. 현재는 spring 서버 로컬에서 실행
+
+

@@ -1,5 +1,6 @@
 package com.trillion.server.counsel.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.common.exception.SuccessMessages;
 import com.trillion.server.common.exception.SuccessResponse;
@@ -7,7 +8,6 @@ import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.service.CounselService;
 import lombok.RequiredArgsConstructor;
-import org.checkerframework.checker.units.qual.C;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,7 +33,7 @@ public class CounselController {
     @PostMapping("/write")
     public ResponseEntity<SuccessResponse<Void>> createCounsel(
             @CookieValue(value = "accessToken", required = false) String accessToken,
-            @RequestBody CounselDto.CounselCreateRequest request){
+            @RequestBody CounselDto.CounselCreateRequest request) throws JsonProcessingException {
 
         if(accessToken == null || accessToken.isEmpty()){
             throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);

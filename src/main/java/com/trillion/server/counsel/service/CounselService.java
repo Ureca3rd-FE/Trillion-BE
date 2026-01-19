@@ -1,5 +1,7 @@
 package com.trillion.server.counsel.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.entity.CounselEntity;
@@ -39,7 +41,7 @@ public class CounselService {
     private String aiServerUrl;
 
     @Transactional
-    public void createCounsel(Long userId, CounselDto.CounselCreateRequest request){
+    public void createCounsel(Long userId, CounselDto.CounselCreateRequest request) throws JsonProcessingException {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
@@ -56,18 +58,26 @@ public class CounselService {
 
         counselRepository.save(counsel);
 
+        // 1. 데이터 준비 (기존과 동일)
         Map<String, String> aiRequest = new HashMap<>();
         aiRequest.put("chat", request.chat());
         aiRequest.put("date", request.date());
 
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonBody = objectMapper.writeValueAsString(aiRequest);
+
+        RestTemplate tempRestTemplate = new RestTemplate();
+
+        // 헤더 설정
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, String>> entity = new HttpEntity<>(aiRequest, headers);
+        headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+        HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
         try{
             log.info("AI 서버 ({})로 분석 요청 전송...", aiServerUrl);
 
-            String aiResponseJson = restTemplate.postForObject(aiServerUrl, entity, String.class);
+            String aiResponseJson = tempRestTemplate.postForObject(aiServerUrl, entity, String.class);
 
             log.info("AI 분석 성공. DB 업데이트");
             counsel.completeAnalysis(aiResponseJson);
