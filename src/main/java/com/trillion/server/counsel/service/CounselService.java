@@ -45,7 +45,7 @@ public class CounselService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         LocalDate counselDate = LocalDate.parse(request.date(), formatter);
 
         CounselEntity counsel = CounselEntity.builder()

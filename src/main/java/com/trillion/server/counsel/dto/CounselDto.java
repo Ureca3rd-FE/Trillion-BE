@@ -16,7 +16,7 @@ public class CounselDto {
 
     @Builder
     public record CounselCreateRequest(
-            @NotBlank(message = "yyyy.mm.dd")
+            @NotBlank(message = "yyyy-mm-dd")
             String date,
 
             @NotBlank(message = "상담 내용을 입력하세요.")
