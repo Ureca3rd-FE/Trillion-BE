@@ -129,12 +129,10 @@ public class SecurityConfig {
 
             if(loginResponse.isNewUser()){
                 targetUrl = UriComponentsBuilder.fromUriString(frontUrl + "/auth/logincheck")
-                        .queryParam("refreshToken", refreshToken)
                         .queryParam("isNewUser", true)
                         .build().toUriString();
             }else{
                 targetUrl = UriComponentsBuilder.fromUriString(frontUrl + "/")
-                        .queryParam("refreshToken", refreshToken)
                         .build().toUriString();
             }
             response.sendRedirect(targetUrl);
