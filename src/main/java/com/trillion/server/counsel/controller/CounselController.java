@@ -7,6 +7,7 @@ import com.trillion.server.common.exception.SuccessResponse;
 import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.service.CounselService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +23,7 @@ public class CounselController {
 
     @GetMapping
     public ResponseEntity<SuccessResponse<List<CounselDto.CounselListResponse>>> getCounselList(
-        @CookieValue(value = "accessToken", required = false) String accessToken){
+        @CookieValue(value = "accessToken") String accessToken){
 
         Long userId = jwtUtil.extractUserId(accessToken);
         List<CounselDto.CounselListResponse> responses = counselService.getCounselList(userId);
@@ -32,8 +33,8 @@ public class CounselController {
 
     @PostMapping("/write")
     public ResponseEntity<SuccessResponse<Void>> createCounsel(
-            @CookieValue(value = "accessToken", required = false) String accessToken,
-            @RequestBody CounselDto.CounselCreateRequest request) throws JsonProcessingException {
+            @CookieValue(value = "accessToken") String accessToken,
+            @Valid @RequestBody CounselDto.CounselCreateRequest request) throws JsonProcessingException {
 
         if(accessToken == null || accessToken.isEmpty()){
             throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
@@ -47,7 +48,7 @@ public class CounselController {
 
     @GetMapping("/{counselId}")
     public ResponseEntity<SuccessResponse<CounselDto.CounselDetailResponse>> getCounselDetail(
-            @CookieValue(value = "accessToken", required = false) String accessToken,
+            @CookieValue(value = "accessToken") String accessToken,
             @PathVariable Long counselId
     ){
         Long userId = jwtUtil.extractUserId(accessToken);
