@@ -5,7 +5,6 @@ import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.service.CounselService;
 import lombok.RequiredArgsConstructor;
-import org.checkerframework.checker.units.qual.C;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +19,7 @@ public class CounselController {
 
     @GetMapping
     public ResponseEntity<SuccessResponse<List<CounselDto.CounselListResponse>>> getCounselList(
-        @CookieValue(value = "accessToken", required = false) String accessToken){
+        @CookieValue(value = "accessToken") String accessToken){
 
         Long userId = jwtUtil.extractUserId(accessToken);
         List<CounselDto.CounselListResponse> responses = counselService.getCounselList(userId);
@@ -30,7 +29,7 @@ public class CounselController {
 
     @GetMapping("/{counselId}")
     public ResponseEntity<SuccessResponse<CounselDto.CounselDetailResponse>> getCounselDetail(
-            @CookieValue(value = "accessToken", required = false) String accessToken,
+            @CookieValue(value = "accessToken") String accessToken,
             @PathVariable Long counselId
     ){
         Long userId = jwtUtil.extractUserId(accessToken);
