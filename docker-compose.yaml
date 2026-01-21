@@ -20,7 +20,7 @@ services:
 
   trillion-ai:
     build:
-      context: ../Trillion-AI
+      context: ../Trillion_AI
       dockerfile: Dockerfile
     container_name: trillionAI
     restart: always
@@ -28,7 +28,7 @@ services:
       - "8000:8000"
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - PYTHONUNBUFFERED=1
 
 # 배포시, spring-app 따로 작성 필요. 현재는 spring 서버 로컬에서 실행
-
 

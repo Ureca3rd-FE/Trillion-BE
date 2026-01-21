@@ -11,8 +11,10 @@ public final class SuccessMessages {
 
     public static final String USER_PROFILE_LOOKUP_SUCCESS = "회원 정보 조회에 성공했습니다.";
     public static final String USER_WITHDRAW_SUCCESS = "회원 탈퇴가 완료되었습니다.";
-
     public static final String REQUEST_SUCCESS = "요청이 성공적으로 처리되었습니다.";
 
     public static final String SIGNUP_SUCCESS = "회원가입이 완료되었습니다.";
+
+    public static final String COUNSEL_CREATE_SUCCESS = "상담 내용이 성공적으로 등록되었습니다.";
+
 }

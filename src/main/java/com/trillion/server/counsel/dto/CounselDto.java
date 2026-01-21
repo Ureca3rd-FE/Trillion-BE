@@ -6,12 +6,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trillion.server.counsel.entity.CounselEntity;
 import com.trillion.server.counsel.entity.CounselStatus;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import java.time.format.DateTimeFormatter;
 
 public class CounselDto {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
     private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Builder
+    public record CounselCreateRequest(
+            @NotBlank(message = "yyyy-mm-dd")
+            String date,
+
+            @NotBlank(message = "상담 내용을 입력하세요.")
+            String chat
+    ) {}
 
     @Builder
     public record CounselListResponse(
@@ -38,7 +48,7 @@ public class CounselDto {
             String title,
             String counselDate,
             CounselStatus status,
-            String content,
+            String chat,
 
             @JsonRawValue
             String summaryJson,
@@ -51,7 +61,7 @@ public class CounselDto {
                     .title(entity.getTitle())
                     .counselDate(entity.getCounselDate() != null ? entity.getCounselDate().format(DATE_FORMATTER) : "")
                     .status(entity.getStatus())
-                    .content(entity.getContent())
+                    .chat(entity.getChat())
                     .summaryJson(entity.getSummaryJson())
                     .createdAt(entity.getCreatedAt().format(DATE_FORMATTER))
                     .build();
