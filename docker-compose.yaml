@@ -20,7 +20,7 @@ services:
 
   trillion-ai:
     build:
-      context: ../Trillion-AI
+      context: ../Trillion_AI
       dockerfile: Dockerfile
     container_name: trillionAI
     restart: always
