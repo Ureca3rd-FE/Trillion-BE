@@ -23,4 +23,6 @@ public final class ErrorMessages {
     public static final String NOT_FOUND = "요청한 리소스를 찾을 수 없습니다.";
     public static final String UNAUTHORIZED = "인증이 필요합니다.";
     public static final String FORBIDDEN = "접근 권한이 없습니다.";
+
+    public static final String COUNSEL_NOT_FOUND = "상담 기록을 찾을 수 없습니다.";
 }
