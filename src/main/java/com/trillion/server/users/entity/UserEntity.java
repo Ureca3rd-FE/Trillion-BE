@@ -1,10 +1,13 @@
 package com.trillion.server.users.entity;
 
+import com.trillion.server.counsel.entity.CounselEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users", indexes = {
@@ -30,6 +33,9 @@ public class UserEntity {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private Role role;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CounselEntity> counsels = new ArrayList<>();
 
     @Builder
     public UserEntity(String kakaoId, String nickname, Role role) {
