@@ -68,6 +68,12 @@ public class CounselDto {
         }
     }
 
+    @Builder
+    public record QuestionRequest(
+            @NotBlank(message = "질문을 입력해주세요.")
+            String question
+    ){}
+
     private static String extractTitleFromJson(String jsonString){
         if(jsonString == null || jsonString.isBlank()){
             return "요약 정보 없음";

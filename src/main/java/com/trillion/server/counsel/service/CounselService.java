@@ -1,7 +1,9 @@
 package com.trillion.server.counsel.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.entity.CounselEntity;
@@ -9,6 +11,7 @@ import com.trillion.server.counsel.entity.CounselStatus;
 import com.trillion.server.counsel.repository.CounselRepository;
 import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.repository.UserRepository;
+import io.swagger.v3.core.util.Json;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +39,7 @@ public class CounselService {
     private final CounselRepository counselRepository;
     private final UserRepository userRepository;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${ai.server.url}")
     private String aiServerUrl;
@@ -87,6 +91,33 @@ public class CounselService {
         }
     }
 
+    @Transactional
+    public void question(Long userId, Long counselId, String question){
+        CounselEntity counsel = counselRepository.findById(counselId)
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.COUNSEL_NOT_FOUND));
+
+        Map<String, Object> ai_request = new HashMap<>();
+        ai_request.put("question", question);
+
+        try{
+            JsonNode contextNode = objectMapper.readTree(counsel.getSummaryJson());
+            ai_request.put("context", contextNode);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(ai_request, headers);
+
+            log.info("AI 서버로 추가 질문 전송중...");
+//            String ai_answer = restTemplate.postForObject(aiServerUrl + "/question", entity, String.class);
+            String ai_answer = "테스트 답변";
+            log.info("AI 수신 완료");
+
+            updateSummaryJson(counsel, question, ai_answer);
+        }catch (Exception e){
+            log.error("실패: {}", e.getMessage());
+        }
+    }
+
     public List<CounselDto.CounselListResponse> getCounselList(Long userId){
         List<CounselEntity> counsels = counselRepository.findAllByUserIdOrderByCounselDateDesc(userId);
 
@@ -103,5 +134,28 @@ public class CounselService {
             throw new AccessDeniedException(ErrorMessages.FORBIDDEN);
         }
         return CounselDto.CounselDetailResponse.from(counsel);
+    }
+
+    private void updateSummaryJson(CounselEntity counsel, String question, String answer) throws JsonProcessingException{
+        JsonNode rootNode = objectMapper.readTree(counsel.getSummaryJson());
+        JsonNode summaryRaw = rootNode.path("result").path("summary");
+
+        ObjectNode summaryNode = (ObjectNode) summaryRaw;
+
+        com.fasterxml.jackson.databind.node.ArrayNode array;
+        if(summaryNode.has("additional_questions"))
+            array = (com.fasterxml.jackson.databind.node.ArrayNode) summaryNode.get("additional_questions");
+        else{
+            array = summaryNode.putArray("additional_questions");
+        }
+
+        ObjectNode newQa = objectMapper.createObjectNode();
+        newQa.put("question", question);
+        newQa.put("answer", answer);
+
+        array.add(newQa);
+
+        String updatedJson = objectMapper.writeValueAsString(rootNode);
+        counsel.completeAnalysis(updatedJson);
     }
 }

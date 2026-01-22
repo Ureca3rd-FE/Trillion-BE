@@ -56,4 +56,17 @@ public class CounselController {
 
         return ResponseEntity.ok(SuccessResponse.of(response));
     }
+
+    @PostMapping("/{counselId}/question")
+    public ResponseEntity<SuccessResponse<Void>> question(
+            @CookieValue(value = "accessToken") String accessToken,
+            @PathVariable Long counselId,
+            @Valid @RequestBody CounselDto.QuestionRequest request
+    ){
+        Long userId = jwtUtil.extractUserId(accessToken);
+
+        counselService.question(userId, counselId, request.question());
+
+        return ResponseEntity.ok(SuccessResponse.of(SuccessMessages.COUNSEL_CREATE_SUCCESS));
+    }
 }
