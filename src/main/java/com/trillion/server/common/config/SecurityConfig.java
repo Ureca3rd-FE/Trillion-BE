@@ -12,6 +12,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
@@ -36,6 +39,7 @@ public class SecurityConfig {
     private final AuthService authService;
     private final ObjectMapper objectMapper;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OAuth2AuthorizedClientRepository authorizedClientRepository;
     
     @Value("${jwt.access-token-expiration:3600000}")
     private long accessTokenExpiration;
@@ -113,7 +117,19 @@ public class SecurityConfig {
         return (request, response, authentication) -> {
             OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
 
-            AuthDto.LoginResponse loginResponse = authService.processKakaoLogin(oAuth2User);
+            String kakaoRefreshToken = null;
+            if(authentication instanceof OAuth2AuthenticationToken oauthToken){
+                OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient(
+                        oauthToken.getAuthorizedClientRegistrationId(),
+                        oauthToken,
+                        request
+                );
+
+                if(client != null && client.getRefreshToken() != null){
+                    kakaoRefreshToken = client.getRefreshToken().getTokenValue();
+                }
+            }
+            AuthDto.LoginResponse loginResponse = authService.processKakaoLogin(oAuth2User, kakaoRefreshToken);
             
             String accessToken = loginResponse.accessToken();
             String refreshToken = loginResponse.refreshToken();

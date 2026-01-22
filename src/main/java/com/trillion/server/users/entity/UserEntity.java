@@ -34,6 +34,9 @@ public class UserEntity {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @Column(name = "social_rafresh_token", length = 500)
+    private String socialRefreshToken;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CounselEntity> counsels = new ArrayList<>();
 
@@ -42,6 +45,10 @@ public class UserEntity {
         this.kakaoId = kakaoId;
         this.nickname = nickname;
         this.role = role;
+    }
+
+    public void updateSocialRefreshToken(String token){
+        this.socialRefreshToken = token;
     }
 
     public void upgradeToUser(){
