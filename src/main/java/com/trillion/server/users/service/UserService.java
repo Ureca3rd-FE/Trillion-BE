@@ -36,6 +36,9 @@ public class UserService {
     @Value("${spring.security.oauth2.client.registration.kakao.client-id}")
     private String kakaoClientId;
 
+    @Value("${spring.security.oauth2.client.registration.kakao.client-secret}")
+    private String kakaoClientSecret;
+
     @Transactional(readOnly = true)
     public UserEntity getCurrentUser(Long userId) {
         if (userId == null) {
@@ -83,6 +86,7 @@ public class UserService {
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("grant_type", "refresh_token");
         body.add("client_id", kakaoClientId);
+        body.add("client_secret", kakaoClientSecret);
         body.add("refresh_token", refreshToken);
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
