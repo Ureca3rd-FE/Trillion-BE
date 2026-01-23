@@ -17,4 +17,6 @@ public final class SuccessMessages {
 
     public static final String COUNSEL_CREATE_SUCCESS = "상담 내용이 성공적으로 등록되었습니다.";
 
+    public static final String COUNSEL_QUESTION_SUCCESS = "질문이 성공적으로 등록되었습니다.";
+
 }

@@ -58,15 +58,15 @@ public class CounselController {
     }
 
     @PostMapping("/{counselId}/question")
-    public ResponseEntity<SuccessResponse<Void>> question(
+    public ResponseEntity<SuccessResponse<CounselDto.QuestionResponse>> question(
             @CookieValue(value = "accessToken") String accessToken,
             @PathVariable Long counselId,
             @Valid @RequestBody CounselDto.QuestionRequest request
     ){
         Long userId = jwtUtil.extractUserId(accessToken);
 
-        counselService.question(userId, counselId, request.question());
+        CounselDto.QuestionResponse responseData = counselService.question(userId, counselId, request.question());
 
-        return ResponseEntity.ok(SuccessResponse.of(SuccessMessages.COUNSEL_CREATE_SUCCESS));
+        return ResponseEntity.ok(SuccessResponse.of(SuccessMessages.COUNSEL_QUESTION_SUCCESS, responseData));
     }
 }

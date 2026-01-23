@@ -28,4 +28,7 @@ public final class ErrorMessages {
 
     public static final String AI_ANALYSIS_FAILED = "AI 분석 중 오류가 발생했습니다.";
     public static final String INVALID_DATE_FORMAT = "날짜 형식이 올바르지 않습니다. (yyyy.MM.dd)";
+
+    public static final String COUNSEL_QUESTION_FAIL = "AI 질문 처리에 실패";
+    public static final String COUNSEL_SUMMARY_FAIL = "JSON 구조가 올바르지 않습니다.";
 }

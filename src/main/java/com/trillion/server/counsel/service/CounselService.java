@@ -11,7 +11,6 @@ import com.trillion.server.counsel.entity.CounselStatus;
 import com.trillion.server.counsel.repository.CounselRepository;
 import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.repository.UserRepository;
-import io.swagger.v3.core.util.Json;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -67,10 +66,7 @@ public class CounselService {
         aiRequest.put("chat", request.chat());
         aiRequest.put("date", request.date());
 
-        ObjectMapper objectMapper = new ObjectMapper();
         String jsonBody = objectMapper.writeValueAsString(aiRequest);
-
-        RestTemplate tempRestTemplate = new RestTemplate();
 
         // 헤더 설정
         HttpHeaders headers = new HttpHeaders();
@@ -80,8 +76,7 @@ public class CounselService {
 
         try{
             log.info("AI 서버 ({})로 분석 요청 전송...", aiServerUrl);
-
-            String aiResponseJson = tempRestTemplate.postForObject(aiServerUrl, entity, String.class);
+            String aiResponseJson = restTemplate.postForObject(aiServerUrl, entity, String.class);
 
             log.info("AI 분석 성공. DB 업데이트");
             counsel.completeAnalysis(aiResponseJson);
@@ -92,30 +87,41 @@ public class CounselService {
     }
 
     @Transactional
-    public void question(Long userId, Long counselId, String question){
+    public CounselDto.QuestionResponse question(Long userId, Long counselId, String question){
         CounselEntity counsel = counselRepository.findById(counselId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.COUNSEL_NOT_FOUND));
 
-        Map<String, Object> ai_request = new HashMap<>();
-        ai_request.put("question", question);
+        if(!counsel.getUser().getId().equals(userId)){
+            throw new AccessDeniedException(ErrorMessages.FORBIDDEN);
+        }
+
+        String ai_answer = "";
 
         try{
+            Map<String, Object> ai_request = new HashMap<>();
+            ai_request.put("question", question);
+
             JsonNode contextNode = objectMapper.readTree(counsel.getSummaryJson());
-            ai_request.put("context", contextNode);
+            ai_request.put("summary", contextNode);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(ai_request, headers);
 
             log.info("AI 서버로 추가 질문 전송중...");
-//            String ai_answer = restTemplate.postForObject(aiServerUrl + "/question", entity, String.class);
-            String ai_answer = "테스트 답변";
+            ai_answer = restTemplate.postForObject(aiServerUrl + "/question", entity, String.class);
             log.info("AI 수신 완료");
 
             updateSummaryJson(counsel, question, ai_answer);
         }catch (Exception e){
             log.error("실패: {}", e.getMessage());
+            throw new RuntimeException(ErrorMessages.COUNSEL_QUESTION_FAIL);
         }
+
+        return CounselDto.QuestionResponse.builder()
+                .question(question)
+                .answer(ai_answer)
+                .build();
     }
 
     public List<CounselDto.CounselListResponse> getCounselList(Long userId){
@@ -138,13 +144,24 @@ public class CounselService {
 
     private void updateSummaryJson(CounselEntity counsel, String question, String answer) throws JsonProcessingException{
         JsonNode rootNode = objectMapper.readTree(counsel.getSummaryJson());
-        JsonNode summaryRaw = rootNode.path("result").path("summary");
+        JsonNode resultNode = rootNode.path("result");
+        JsonNode summaryRaw = resultNode.path("summary");
+
+        if(summaryRaw.isMissingNode() || !summaryRaw.isObject()){
+            throw new IllegalArgumentException(ErrorMessages.COUNSEL_SUMMARY_FAIL);
+        }
 
         ObjectNode summaryNode = (ObjectNode) summaryRaw;
-
         com.fasterxml.jackson.databind.node.ArrayNode array;
-        if(summaryNode.has("additional_questions"))
-            array = (com.fasterxml.jackson.databind.node.ArrayNode) summaryNode.get("additional_questions");
+
+        if(summaryNode.has("additional_questions")){
+            JsonNode existingNode = summaryNode.get("additional_questions");
+            if(existingNode.isArray()){
+                array = (com.fasterxml.jackson.databind.node.ArrayNode) summaryNode.get("additional_questions");
+            }else{
+                array = summaryNode.putArray("additional_questions");
+            }
+        }
         else{
             array = summaryNode.putArray("additional_questions");
         }

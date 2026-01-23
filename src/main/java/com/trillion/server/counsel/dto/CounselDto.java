@@ -74,6 +74,12 @@ public class CounselDto {
             String question
     ){}
 
+    @Builder
+    public record QuestionResponse(
+            String question,
+            String answer
+    ){}
+
     private static String extractTitleFromJson(String jsonString){
         if(jsonString == null || jsonString.isBlank()){
             return "요약 정보 없음";
