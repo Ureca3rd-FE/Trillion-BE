@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +45,7 @@ public class CounselService {
     private String aiServerUrl;
 
     @Transactional
-    public void createCounsel(Long userId, CounselDto.CounselCreateRequest request) throws JsonProcessingException {
+    public Long createCounsel(Long userId, CounselDto.CounselCreateRequest request) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
@@ -60,6 +61,14 @@ public class CounselService {
                 .build();
 
         counselRepository.save(counsel);
+        return counsel.getId();
+    }
+
+        @Async
+        @Transactional
+        public void processAiAnalysis(Long counselId, CounselDto.CounselCreateRequest request) throws JsonProcessingException{
+            CounselEntity counsel = counselRepository.findById(counselId)
+                    .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.COUNSEL_NOT_FOUND));
 
         // 1. 데이터 준비 (기존과 동일)
         Map<String, String> aiRequest = new HashMap<>();

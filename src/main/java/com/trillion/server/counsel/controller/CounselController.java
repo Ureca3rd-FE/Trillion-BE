@@ -46,7 +46,9 @@ public class CounselController {
         }
 
         Long userId = jwtUtil.extractUserId(accessToken);
-        counselService.createCounsel(userId, request);
+        Long counselId = counselService.createCounsel(userId, request);
+
+        counselService.processAiAnalysis(counselId, request);
 
         return ResponseEntity.ok(SuccessResponse.of(SuccessMessages.COUNSEL_CREATE_SUCCESS));
     }
