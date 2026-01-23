@@ -6,6 +6,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -19,6 +21,7 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 public class CounselEntity {
 
+    private static final Logger log = LoggerFactory.getLogger(CounselEntity.class);
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -69,6 +72,7 @@ public class CounselEntity {
 
     public void completeAnalysis(String summaryJson){
         this.summaryJson = summaryJson;
+        log.info("Summary JSON set to: {}", summaryJson);
         this.status = CounselStatus.COMPLETED;
     }
 

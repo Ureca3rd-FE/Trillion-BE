@@ -37,8 +37,8 @@ import java.util.stream.Collectors;
 public class CounselService {
     private final CounselRepository counselRepository;
     private final UserRepository userRepository;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${ai.server.url}")
     private String aiServerUrl;
@@ -73,11 +73,12 @@ public class CounselService {
         headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
         HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+        log.info("AI request: {} ", entity.toString());
 
         try{
             log.info("AI 서버 ({})로 분석 요청 전송...", aiServerUrl);
             String aiResponseJson = restTemplate.postForObject(aiServerUrl, entity, String.class);
-
+            log.info(aiResponseJson);
             log.info("AI 분석 성공. DB 업데이트");
             counsel.completeAnalysis(aiResponseJson);
         }catch (Exception e){
@@ -108,9 +109,23 @@ public class CounselService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(ai_request, headers);
 
-            log.info("AI 서버로 추가 질문 전송중...");
+            log.info("AI 서버로 추가 질문 전송중...", ai_request);
             ai_answer = restTemplate.postForObject(aiServerUrl + "/question", entity, String.class);
-            log.info("AI 수신 완료");
+            log.info("AI 수신 완료,{}", ai_answer);
+
+
+            if(!ai_answer.isEmpty()){
+                String cleanAnswer = ai_answer;
+
+                if (ai_answer.startsWith("\"") && ai_answer.endsWith("\"")) {
+                    cleanAnswer = ai_answer.substring(1, ai_answer.length() - 1)
+                            .replace("\\\"", "\"")  // 이스케이프된 따옴표 복구
+                            .replace("\\n", "\n");  // 줄바꿈 복구
+                }
+                ai_answer = cleanAnswer;
+            }
+            log.info("AI 답변 정제 완료: {}", ai_answer);
+
 
             updateSummaryJson(counsel, question, ai_answer);
         }catch (Exception e){
@@ -144,7 +159,9 @@ public class CounselService {
 
     private void updateSummaryJson(CounselEntity counsel, String question, String answer) throws JsonProcessingException{
         JsonNode rootNode = objectMapper.readTree(counsel.getSummaryJson());
-        JsonNode resultNode = rootNode.path("result");
+
+        JsonNode resultNode = rootNode.path("data");
+
         JsonNode summaryRaw = resultNode.path("summary");
 
         if(summaryRaw.isMissingNode() || !summaryRaw.isObject()){
@@ -170,9 +187,12 @@ public class CounselService {
         newQa.put("question", question);
         newQa.put("answer", answer);
 
+
+
         array.add(newQa);
 
         String updatedJson = objectMapper.writeValueAsString(rootNode);
         counsel.completeAnalysis(updatedJson);
+        log.info("CounselEntity 요약 JSON 업데이트 완료");
     }
 }
