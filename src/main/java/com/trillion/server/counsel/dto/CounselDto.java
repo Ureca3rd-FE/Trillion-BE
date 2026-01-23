@@ -90,7 +90,7 @@ public class CounselDto {
         }
         try{
             JsonNode rootNode = objectMapper.readTree(jsonString);
-            JsonNode titleNode = rootNode.path("result").path("summary").path("counsel_title");
+            JsonNode titleNode = rootNode.path("data").path("summary").path("counsel_title");
 
             if (titleNode.isMissingNode()) {
                 return "요약 내용 없음";
