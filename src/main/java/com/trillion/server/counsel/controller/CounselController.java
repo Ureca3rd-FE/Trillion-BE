@@ -7,6 +7,7 @@ import com.trillion.server.common.exception.SuccessResponse;
 import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.service.CounselService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ public class CounselController {
     private final CounselService counselService;
     private final JwtUtil jwtUtil;
 
+    @Operation(summary = "회원 요약 리스트 조회", description = "해당 회원이 작성한 상담 요약 리스트를 조회힙니다.")
     @GetMapping
     public ResponseEntity<SuccessResponse<List<CounselDto.CounselListResponse>>> getCounselList(
         @CookieValue(value = "accessToken") String accessToken){
@@ -31,7 +33,8 @@ public class CounselController {
         return ResponseEntity.ok(SuccessResponse.of(responses));
     }
 
-    @PostMapping("/write")
+    @Operation(summary = "요약하기", description = "상담 요약을 생성합니다.")
+    @PostMapping("/summary")
     public ResponseEntity<SuccessResponse<Void>> createCounsel(
             @CookieValue(value = "accessToken") String accessToken,
             @Valid @RequestBody CounselDto.CounselCreateRequest request) throws JsonProcessingException {
@@ -46,6 +49,7 @@ public class CounselController {
         return ResponseEntity.ok(SuccessResponse.of(SuccessMessages.COUNSEL_CREATE_SUCCESS));
     }
 
+    @Operation(summary = "요약 상세 조회", description = "상담 요약의 상세 내용을 조회합니다.")
     @GetMapping("/{counselId}")
     public ResponseEntity<SuccessResponse<CounselDto.CounselDetailResponse>> getCounselDetail(
             @CookieValue(value = "accessToken") String accessToken,
@@ -57,6 +61,7 @@ public class CounselController {
         return ResponseEntity.ok(SuccessResponse.of(response));
     }
 
+    @Operation(summary = "추가 질문", description = "상세 조회에서 추가질문을 하고 답변을 받습니다.")
     @PostMapping("/{counselId}/question")
     public ResponseEntity<SuccessResponse<CounselDto.QuestionResponse>> question(
             @CookieValue(value = "accessToken") String accessToken,
