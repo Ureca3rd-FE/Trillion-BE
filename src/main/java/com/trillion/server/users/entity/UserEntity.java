@@ -2,10 +2,7 @@ package com.trillion.server.users.entity;
 
 import com.trillion.server.counsel.entity.CounselEntity;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +11,8 @@ import java.util.List;
     @Index(name = "idx_kakao_id", columnList = "kakao_id"),
 })
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserEntity {
 
@@ -34,18 +33,12 @@ public class UserEntity {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    @Column(name = "social_rafresh_token", length = 500)
+    @Column(name = "social_refresh_token", length = 500)
     private String socialRefreshToken;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<CounselEntity> counsels = new ArrayList<>();
-
-    @Builder
-    public UserEntity(String kakaoId, String nickname, Role role) {
-        this.kakaoId = kakaoId;
-        this.nickname = nickname;
-        this.role = role;
-    }
 
     public void updateSocialRefreshToken(String token){
         this.socialRefreshToken = token;
