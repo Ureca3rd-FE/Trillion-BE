@@ -8,6 +8,7 @@ import com.trillion.server.common.util.JwtUtil;
 import com.trillion.server.counsel.dto.CounselDto;
 import com.trillion.server.counsel.service.CounselService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("api/counsels")
 @RequiredArgsConstructor
+@Tag(name ="상담", description = "상담 요약 관리 API")
 public class CounselController {
     private final CounselService counselService;
     private final JwtUtil jwtUtil;
