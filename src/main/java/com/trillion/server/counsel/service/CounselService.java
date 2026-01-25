@@ -55,6 +55,7 @@ public class CounselService {
         CounselEntity counsel = CounselEntity.builder()
                 .user(user)
                 .counselDate(counselDate)
+                .title(request.title())
                 .chat(request.chat())
                 .status(CounselStatus.PENDING)
                 .createdAt(java.time.LocalDateTime.now())

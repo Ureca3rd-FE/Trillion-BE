@@ -13,12 +13,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class CounselDto {
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final Pattern MARKUP_PATTERN = Pattern.compile("\\{\\{(.*?)::(.*?)\\}\\}");
 
     @Builder
     public record CounselCreateRequest(
+            String title,
+
             @NotBlank(message = "yyyy-mm-dd")
             String date,
 
