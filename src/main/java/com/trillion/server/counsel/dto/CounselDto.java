@@ -10,6 +10,7 @@ import com.trillion.server.counsel.entity.CounselStatus;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +50,14 @@ public class CounselDto {
                     .category(entity.getCategory() != null ? entity.getCategory().getDescription() : null)
                     .build();
         }
+    }
+
+    @Builder
+    public record CounselCursorResponse(
+            List<CounselListResponse> content,
+            boolean hasNext,
+            Long nextCursorId
+    ) {
     }
 
     @Builder

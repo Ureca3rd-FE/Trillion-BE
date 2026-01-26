@@ -3,6 +3,7 @@ package com.trillion.server.counsel.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.trillion.server.common.exception.ErrorMessages;
 import com.trillion.server.counsel.dto.CounselDto;
@@ -12,23 +13,26 @@ import com.trillion.server.counsel.entity.CounselStatus;
 import com.trillion.server.counsel.repository.CounselRepository;
 import com.trillion.server.users.entity.UserEntity;
 import com.trillion.server.users.repository.UserRepository;
-import io.swagger.v3.core.util.Json;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -40,11 +44,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CounselService {
+
     private final CounselRepository counselRepository;
     private final UserRepository userRepository;
-//    private final RestTemplate restTemplate = new RestTemplate();
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
 
     @Value("${ai.server.url}")
@@ -71,36 +74,47 @@ public class CounselService {
         return counsel.getId();
     }
 
-        @Async
-        public void processAiAnalysis(Long counselId, CounselDto.CounselCreateRequest request) throws JsonProcessingException{
-            CounselEntity counsel = counselRepository.findById(counselId)
-                    .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.COUNSEL_NOT_FOUND));
+    @Async
+    public void processAiAnalysis(Long counselId, CounselDto.CounselCreateRequest request) {
+        try {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(5000);
+            factory.setReadTimeout(120000);
+            factory.setBufferRequestBody(true);
 
-            String aiResponseJson = null;
-            try{
-                Map<String, String> aiRequest = new HashMap<>();
-                aiRequest.put("chat", request.chat());
-                aiRequest.put("date", request.date());
+            RestTemplate localRestTemplate = new RestTemplate(factory);
+            localRestTemplate.getMessageConverters()
+                    .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
 
-                String jsonBody = objectMapper.writeValueAsString(aiRequest);
-                HttpHeaders headers = new HttpHeaders();
-                headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-                HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+            Map<String, String> aiRequestMap = new HashMap<>();
+            aiRequestMap.put("chat", request.chat());
+            aiRequestMap.put("date", request.date());
 
-                log.info("AI 서버 ({})로 분석 요청 전송...", aiServerUrl);
-                aiResponseJson = restTemplate.postForObject(aiServerUrl, entity, String.class);
-                CounselCategory category = extractCategory(aiResponseJson);
+            String jsonBody = objectMapper.writeValueAsString(aiRequestMap);
 
-                updateStatusInTransaction(counselId, CounselStatus.COMPLETED, aiResponseJson, category);
-                log.info(aiResponseJson);
-                log.info("AI 분석 성공. DB 업데이트");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-            }catch (Exception e){
-                log.error("AI 서버 통신 실패: {}", e.getMessage());
-                updateStatusInTransaction(counselId, CounselStatus.FAILED, null, null);
+            HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+
+            log.info("AI 서버({})로 분석 요청 전송 (Timeout: 120s)", aiServerUrl);
+
+            String aiResponseJson = localRestTemplate.postForObject(aiServerUrl, entity, String.class);
+            log.info("AI 응답 수신 완료: {}", aiResponseJson);
+
+            CounselCategory category = extractCategory(aiResponseJson);
+            updateStatusInTransaction(counselId, CounselStatus.COMPLETED, aiResponseJson, category);
+
+            log.info("AI 분석 성공 (CounselId: {})", counselId);
+
+        } catch (RestClientResponseException e) {
+            log.error("AI 서버 통신 에러 (Code: {}): {}", e.getStatusCode(), e.getResponseBodyAsString());
+            updateStatusInTransaction(counselId, CounselStatus.FAILED, null, null);
+        } catch (Exception e) {
+            log.error("AI 분석 중 예상치 못한 에러: ", e);
+            updateStatusInTransaction(counselId, CounselStatus.FAILED, null, null);
         }
     }
-
 
     public CounselDto.QuestionResponse question(Long userId, Long counselId, String question){
         CounselEntity counsel = counselRepository.findById(counselId)
@@ -110,34 +124,44 @@ public class CounselService {
             throw new AccessDeniedException(ErrorMessages.FORBIDDEN);
         }
 
-        String currentSummaryJson = counsel.getSummaryJson();
-        String ai_answer = "";
+        String aiAnswer = "";
 
         try{
-            Map<String, Object> ai_request = new HashMap<>();
-            ai_request.put("question", question);
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(5000);
+            factory.setReadTimeout(60000);
+            factory.setBufferRequestBody(true);
 
+            RestTemplate localRestTemplate = new RestTemplate(factory);
+            localRestTemplate.getMessageConverters().add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
+
+            Map<String, Object> aiRequestMap = new HashMap<>();
+            aiRequestMap.put("question", question);
             JsonNode contextNode = objectMapper.readTree(counsel.getSummaryJson());
-            ai_request.put("summary", contextNode);
+            aiRequestMap.put("summary", contextNode);
+
+            String jsonBody = objectMapper.writeValueAsString(aiRequestMap);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(ai_request, headers);
 
-            log.info("AI 서버로 추가 질문 전송중...", ai_request);
-            ai_answer = restTemplate.postForObject(aiServerUrl + "/question", entity, String.class);
-            log.info("AI 수신 완료,{}", ai_answer);
+            HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
+            log.info("AI 서버로 추가 질문 전송중 (Timeout: 60s)");
 
-            if(ai_answer != null && !ai_answer.isEmpty()){
-                if (ai_answer.startsWith("\"") && ai_answer.endsWith("\"")) {
-                    ai_answer = ai_answer.substring(1, ai_answer.length() - 1)
-                            .replace("\\\"", "\"")  // 이스케이프된 따옴표 복구
-                            .replace("\\n", "\n");  // 줄바꿈 복구
+            String rawResponse = localRestTemplate.postForObject(aiServerUrl + "/question", entity, String.class);
+
+            if(rawResponse != null) {
+                if (rawResponse.startsWith("\"") && rawResponse.endsWith("\"")) {
+                    aiAnswer = rawResponse.substring(1, rawResponse.length() - 1)
+                            .replace("\\\"", "\"")
+                            .replace("\\n", "\n");
+                } else {
+                    aiAnswer = rawResponse;
                 }
             }
-            log.info("AI 답변 정제 완료: {}", ai_answer);
-            String finalAnswer = ai_answer;
+            log.info("AI 답변 수신 완료: {}", aiAnswer);
+            final String finalAnswer = aiAnswer;
 
             transactionTemplate.execute(status -> {
                 CounselEntity targetCounsel = counselRepository.findById(counselId)
@@ -149,24 +173,46 @@ public class CounselService {
                 }
                 return null;
             });
-        }catch (Exception e){
-            log.error("실패: {}", e.getMessage());
+        } catch (Exception e){
+            log.error("질문 처리 실패: {}", e.getMessage());
             throw new RuntimeException(ErrorMessages.COUNSEL_QUESTION_FAIL);
         }
 
         return CounselDto.QuestionResponse.builder()
                 .question(question)
-                .answer(ai_answer)
+                .answer(aiAnswer)
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public List<CounselDto.CounselListResponse> getCounselList(Long userId){
-        List<CounselEntity> counsels = counselRepository.findAllByUserIdOrderByCounselDateDesc(userId);
+    public CounselDto.CounselCursorResponse getCounselList(Long userId, Long cursorId, int size) {
+        Pageable pageable = PageRequest.of(0, size);
+        List<CounselEntity> counsels;
 
-        return counsels.stream()
+        if (cursorId == null) {
+            counsels = counselRepository.findAllByUserIdOrderByIdDesc(userId, pageable);
+        } else {
+            counsels = counselRepository.findByUserIdAndIdLessThan(userId, cursorId, pageable);
+        }
+
+        Long nextCursorId = null;
+        boolean hasNext = false;
+
+        if (!counsels.isEmpty()) {
+            CounselEntity lastCounsel = counsels.get(counsels.size() - 1);
+            nextCursorId = lastCounsel.getId();
+            hasNext = counsels.size() == size;
+        }
+
+        List<CounselDto.CounselListResponse> counselDtos = counsels.stream()
                 .map(CounselDto.CounselListResponse::from)
                 .collect(Collectors.toList());
+
+        return CounselDto.CounselCursorResponse.builder()
+                .content(counselDtos)
+                .hasNext(hasNext)
+                .nextCursorId(nextCursorId)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -183,19 +229,23 @@ public class CounselService {
     private void updateSummaryJson(CounselEntity counsel, String question, String answer) throws JsonProcessingException{
         JsonNode rootNode = objectMapper.readTree(counsel.getSummaryJson());
         JsonNode resultNode = rootNode.path("data");
-        JsonNode summaryRaw = resultNode.path("summary");
 
-        if(summaryRaw.isMissingNode() || !summaryRaw.isObject()){
+        JsonNode summaryRaw = resultNode.path("summary");
+        if(summaryRaw.isMissingNode()){
+            summaryRaw = resultNode;
+        }
+
+        if(!summaryRaw.isObject()){
             throw new IllegalArgumentException(ErrorMessages.COUNSEL_SUMMARY_FAIL);
         }
 
         ObjectNode summaryNode = (ObjectNode) summaryRaw;
-        com.fasterxml.jackson.databind.node.ArrayNode array;
+        ArrayNode array;
 
         if(summaryNode.has("additional_questions")){
             JsonNode existingNode = summaryNode.get("additional_questions");
             if(existingNode.isArray()){
-                array = (com.fasterxml.jackson.databind.node.ArrayNode) summaryNode.get("additional_questions");
+                array = (ArrayNode) existingNode;
             }else{
                 array = summaryNode.putArray("additional_questions");
             }
@@ -207,8 +257,6 @@ public class CounselService {
         ObjectNode newQa = objectMapper.createObjectNode();
         newQa.put("question", question);
         newQa.put("answer", answer);
-
-
 
         array.add(newQa);
 
@@ -233,9 +281,17 @@ public class CounselService {
 
     private CounselCategory extractCategory(String jsonString) throws JsonProcessingException {
         JsonNode root = objectMapper.readTree(jsonString);
-        String category = root.path("data").path("category").asText();
+        JsonNode dataNode = root.path("data");
+        JsonNode categoryNode = dataNode.path("summary").path("category");
+
+        if (categoryNode.isMissingNode() || categoryNode.isNull()) {
+            categoryNode = dataNode.path("category");
+        }
+
+        String category = categoryNode.asText();
 
         if(category == null || category.isBlank()){
+            log.error("JSON 구조에서 카테고리를 찾을 수 없음: {}", jsonString);
             throw new IllegalArgumentException(ErrorMessages.CATRGORY_NOT_FOUND);
         }
 

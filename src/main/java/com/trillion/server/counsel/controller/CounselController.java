@@ -26,13 +26,15 @@ public class CounselController {
 
     @Operation(summary = "회원 요약 리스트 조회", description = "해당 회원이 작성한 상담 요약 리스트를 조회힙니다.")
     @GetMapping
-    public ResponseEntity<SuccessResponse<List<CounselDto.CounselListResponse>>> getCounselList(
-        @CookieValue(value = "accessToken") String accessToken){
+    public ResponseEntity<SuccessResponse<CounselDto.CounselCursorResponse>> getCounselList(
+            @CookieValue(value = "accessToken") String accessToken,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") int size ){
 
         Long userId = jwtUtil.extractUserId(accessToken);
-        List<CounselDto.CounselListResponse> responses = counselService.getCounselList(userId);
 
-        return ResponseEntity.ok(SuccessResponse.of(responses));
+        CounselDto.CounselCursorResponse response = counselService.getCounselList(userId, cursorId, size);
+        return ResponseEntity.ok(SuccessResponse.of(response));
     }
 
     @Operation(summary = "요약하기", description = "상담 요약을 생성합니다.")
