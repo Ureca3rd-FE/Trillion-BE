@@ -3,6 +3,7 @@ package com.trillion.server.counsel.dto;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trillion.server.counsel.entity.CounselCategory;
 import com.trillion.server.counsel.entity.CounselEntity;
 import com.trillion.server.counsel.entity.CounselStatus;
 
@@ -33,6 +34,7 @@ public class CounselDto {
             Long counselId,
             String title,
             String date,
+            String category,
             CounselStatus status,
             String summaryPreview
     ){
@@ -44,6 +46,7 @@ public class CounselDto {
                     .date(entity.getCreatedAt().format(DATE_FORMATTER))
                     .status(entity.getStatus())
                     .summaryPreview(extractTitleFromJson(entity.getSummaryJson()))
+                    .category(entity.getCategory() != null ? entity.getCategory().getDescription() : null)
                     .build();
         }
     }
@@ -53,8 +56,6 @@ public class CounselDto {
             Long counselId,
             String title,
             String counselDate,
-            CounselStatus status,
-            String chat,
 
             @JsonRawValue
             String summaryJson,
@@ -66,8 +67,6 @@ public class CounselDto {
                     .counselId(entity.getId())
                     .title(entity.getTitle())
                     .counselDate(entity.getCounselDate() != null ? entity.getCounselDate().format(DATE_FORMATTER) : "")
-                    .status(entity.getStatus())
-                    .chat(entity.getChat())
                     .summaryJson(entity.getSummaryJson())
                     .createdAt(entity.getCreatedAt().format(DATE_FORMATTER))
                     .build();
