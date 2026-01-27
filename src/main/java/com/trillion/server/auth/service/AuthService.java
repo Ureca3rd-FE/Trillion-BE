@@ -24,7 +24,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
 
     @Transactional
-    public AuthDto.LoginResponse processKakaoLogin(OAuth2User oAuth2User) {
+    public AuthDto.LoginResponse processKakaoLogin(OAuth2User oAuth2User, String kakaoRefreshToken) {
         Map<String, Object> attributes = oAuth2User.getAttributes();
 
         String kakaoId = String.valueOf(attributes.get("id"));
@@ -57,6 +57,10 @@ public class AuthService {
             if(user.getRole() == Role.GUEST){
                 isNewUser = true;
             }
+        }
+
+        if(kakaoRefreshToken != null){
+            user.updateSocialRefreshToken(kakaoRefreshToken);
         }
 
         String accessToken = jwtUtil.generateAccessToken(user.getId());

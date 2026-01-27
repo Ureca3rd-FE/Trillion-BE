@@ -3,19 +3,26 @@ package com.trillion.server.counsel.dto;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trillion.server.counsel.entity.CounselCategory;
 import com.trillion.server.counsel.entity.CounselEntity;
 import com.trillion.server.counsel.entity.CounselStatus;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CounselDto {
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Pattern MARKUP_PATTERN = Pattern.compile("\\{\\{(.*?)::(.*?)\\}\\}");
 
     @Builder
     public record CounselCreateRequest(
+            String title,
+
             @NotBlank(message = "yyyy-mm-dd")
             String date,
 
@@ -28,18 +35,29 @@ public class CounselDto {
             Long counselId,
             String title,
             String date,
+            String category,
             CounselStatus status,
             String summaryPreview
     ){
         public static CounselListResponse from(CounselEntity entity){
             return CounselListResponse.builder()
                     .counselId(entity.getId())
-                    .title(entity.getTitle() != null ? entity.getTitle() : "제목 없음")
+
+                    .title(entity.getTitle() != null && !entity.getTitle().isBlank() ? entity.getTitle() : "제목 없음")
                     .date(entity.getCreatedAt().format(DATE_FORMATTER))
                     .status(entity.getStatus())
                     .summaryPreview(extractTitleFromJson(entity.getSummaryJson()))
+                    .category(entity.getCategory() != null ? entity.getCategory().getDescription() : null)
                     .build();
         }
+    }
+
+    @Builder
+    public record CounselCursorResponse(
+            List<CounselListResponse> content,
+            boolean hasNext,
+            Long nextCursorId
+    ) {
     }
 
     @Builder
@@ -47,8 +65,6 @@ public class CounselDto {
             Long counselId,
             String title,
             String counselDate,
-            CounselStatus status,
-            String chat,
 
             @JsonRawValue
             String summaryJson,
@@ -60,13 +76,23 @@ public class CounselDto {
                     .counselId(entity.getId())
                     .title(entity.getTitle())
                     .counselDate(entity.getCounselDate() != null ? entity.getCounselDate().format(DATE_FORMATTER) : "")
-                    .status(entity.getStatus())
-                    .chat(entity.getChat())
                     .summaryJson(entity.getSummaryJson())
                     .createdAt(entity.getCreatedAt().format(DATE_FORMATTER))
                     .build();
         }
     }
+
+    @Builder
+    public record QuestionRequest(
+            @NotBlank(message = "질문을 입력해주세요.")
+            String question
+    ){}
+
+    @Builder
+    public record QuestionResponse(
+            String question,
+            String answer
+    ){}
 
     private static String extractTitleFromJson(String jsonString){
         if(jsonString == null || jsonString.isBlank()){
@@ -74,12 +100,15 @@ public class CounselDto {
         }
         try{
             JsonNode rootNode = objectMapper.readTree(jsonString);
-            JsonNode titleNode = rootNode.path("summary").path("counsel_title");
+            JsonNode titleNode = rootNode.path("data").path("summary").path("counsel_title");
 
             if (titleNode.isMissingNode()) {
                 return "요약 내용 없음";
             }
-            return titleNode.asText();
+
+            String rawTitle = titleNode.asText();
+            Matcher matcher = MARKUP_PATTERN.matcher(rawTitle);
+            return matcher.replaceAll("$1");
 
         } catch (Exception e) {
             return "요약 정보를 불러올 수 없음";

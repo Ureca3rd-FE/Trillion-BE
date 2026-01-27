@@ -6,6 +6,9 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -17,8 +20,8 @@ import java.time.LocalDateTime;
 @Table(name = "counsel")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
+@Slf4j
 public class CounselEntity {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -46,8 +49,12 @@ public class CounselEntity {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true)
+    private CounselCategory category;
+
     @Builder
-    public CounselEntity(UserEntity user, LocalDate counselDate, String chat, String title, String summaryJson, CounselStatus status, LocalDateTime createdAt) {
+    public CounselEntity(UserEntity user, LocalDate counselDate, String chat, String title, String summaryJson, CounselStatus status, LocalDateTime createdAt, CounselCategory category) {
         this.user = user;
         this.counselDate = counselDate;
         this.chat = chat;
@@ -55,6 +62,7 @@ public class CounselEntity {
         this.summaryJson = summaryJson;
         this.status = status != null ? status : CounselStatus.PENDING;
         this.createdAt = createdAt;
+        this.category = category;
     }
 
     public void completeSummary(String title, String summaryJson) {
@@ -69,6 +77,12 @@ public class CounselEntity {
 
     public void completeAnalysis(String summaryJson){
         this.summaryJson = summaryJson;
+        this.status = CounselStatus.COMPLETED;
+    }
+
+    public void completeAnalysis(String summaryJson, CounselCategory category){
+        this.summaryJson = summaryJson;
+        this.category = category;
         this.status = CounselStatus.COMPLETED;
     }
 

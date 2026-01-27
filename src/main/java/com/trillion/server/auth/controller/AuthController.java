@@ -19,7 +19,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("api/auth")
 @RequiredArgsConstructor
 @Tag(name = "인증", description = "JWT 토큰 관리 API")
 public class AuthController {
