@@ -89,4 +89,11 @@ public class CounselEntity {
     public void failAnalysis(){
         this.status = CounselStatus.FAILED;
     }
+
+    public void retryAnalysis(String title, String chat, LocalDate counselDate){
+        this.title = title;
+        this.counselDate = counselDate;
+        this.chat = chat;
+        this.status = CounselStatus.PENDING;
+    }
 }

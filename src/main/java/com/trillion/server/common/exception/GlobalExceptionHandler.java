@@ -61,4 +61,14 @@ public class GlobalExceptionHandler {
         response.put("error", "INTERNAL_SERVER_ERROR");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException e) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", e.getMessage());
+        response.put("error", "BAD_REQUEST");
+
+        return ResponseEntity.badRequest().body(response);
+    }
 }
