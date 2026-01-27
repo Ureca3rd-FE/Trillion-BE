@@ -67,7 +67,7 @@ public class SecurityConfig {
                 .headers(headers -> headers
                 .cacheControl(cache -> cache.disable()))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/refresh", "/login/**", "/oauth2/**", "/error").permitAll()
+                .requestMatchers("/api/auth/refresh", "/login/**", "/oauth2/**", "/error").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
                 .anyRequest().authenticated()
             )
