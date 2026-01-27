@@ -21,6 +21,9 @@ public class CounselDto {
 
     @Builder
     public record CounselCreateRequest(
+
+            Long counselId,
+
             String title,
 
             @NotBlank(message = "yyyy-mm-dd")

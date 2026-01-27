@@ -46,9 +46,14 @@ public class CounselController {
         if(accessToken == null || accessToken.isEmpty()){
             throw new IllegalArgumentException(ErrorMessages.AUTH_TOKEN_REQUIRED);
         }
-
         Long userId = jwtUtil.extractUserId(accessToken);
-        Long counselId = counselService.createCounsel(userId, request);
+        Long counselId;
+
+        if (request.counselId() != null && counselService.existsById(request.counselId())) {
+            counselId = counselService.retryCounsel(userId, request.counselId(), request);
+        } else {
+            counselId = counselService.createCounsel(userId, request);
+        }
 
         counselService.processAiAnalysis(counselId, request);
 

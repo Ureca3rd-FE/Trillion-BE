@@ -49,6 +49,7 @@ public class CounselService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final RestTemplate restTemplate;
 
     @Value("${ai.server.url}")
     private String aiServerUrl;
@@ -74,17 +75,51 @@ public class CounselService {
         return counsel.getId();
     }
 
+    @Transactional
+    public Long retryCounsel(Long userId, Long counselId, CounselDto.CounselCreateRequest request){
+        CounselEntity counsel = counselRepository.findById(counselId)
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.COUNSEL_NOT_FOUND));
+
+        if(!counsel.getUser().getId().equals(userId)){
+            throw new AccessDeniedException(ErrorMessages.FORBIDDEN);
+        }
+
+        switch (counsel.getStatus()){
+            case PENDING:
+                throw new AccessDeniedException(ErrorMessages.AI_IS_RUNNING);
+            case COMPLETED:
+                throw new IllegalStateException("이미 분석이 완료된 상담입니다.");
+            case FAILED:
+
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                LocalDate counselDate = LocalDate.parse(request.date(), formatter);
+
+                counsel.retryAnalysis(request.title(), request.chat(), counselDate);
+                break;
+            default:
+                throw new IllegalArgumentException("알 수 없는 상담 상태입니다.");
+        }
+
+        return counsel.getId();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsById(Long counselId) {
+        if (counselId == null) return false;
+        return counselRepository.existsById(counselId);
+    }
+
     @Async
     public void processAiAnalysis(Long counselId, CounselDto.CounselCreateRequest request) {
         try {
-            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-            factory.setConnectTimeout(5000);
-            factory.setReadTimeout(120000);
-            factory.setBufferRequestBody(true);
-
-            RestTemplate localRestTemplate = new RestTemplate(factory);
-            localRestTemplate.getMessageConverters()
-                    .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
+//            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+//            factory.setConnectTimeout(5000);
+//            factory.setReadTimeout(120000);
+//            factory.setBufferRequestBody(true);
+//
+//            RestTemplate localRestTemplate = new RestTemplate(factory);
+//            localRestTemplate.getMessageConverters()
+//                    .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
 
             Map<String, String> aiRequestMap = new HashMap<>();
             aiRequestMap.put("chat", request.chat());
@@ -99,7 +134,7 @@ public class CounselService {
 
             log.info("AI 서버({})로 분석 요청 전송 (Timeout: 120s)", aiServerUrl);
 
-            String aiResponseJson = localRestTemplate.postForObject(aiServerUrl, entity, String.class);
+            String aiResponseJson = restTemplate.postForObject(aiServerUrl, entity, String.class);
             log.info("AI 응답 수신 완료: {}", aiResponseJson);
 
             CounselCategory category = extractCategory(aiResponseJson);
