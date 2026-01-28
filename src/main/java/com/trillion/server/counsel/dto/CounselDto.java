@@ -68,6 +68,7 @@ public class CounselDto {
             Long counselId,
             String title,
             String counselDate,
+            String chat,
 
             @JsonRawValue
             String summaryJson,
@@ -80,6 +81,7 @@ public class CounselDto {
                     .title(entity.getTitle())
                     .counselDate(entity.getCounselDate() != null ? entity.getCounselDate().format(DATE_FORMATTER) : "")
                     .summaryJson(entity.getSummaryJson())
+                    .chat(entity.getChat())
                     .createdAt(entity.getCreatedAt().format(DATE_FORMATTER))
                     .build();
         }
