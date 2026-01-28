@@ -40,10 +40,10 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final OAuth2AuthorizedClientRepository authorizedClientRepository;
-    
+
     @Value("${jwt.access-token-expiration:3600000}")
     private long accessTokenExpiration;
-    
+
     @Value("${jwt.refresh-token-expiration:604800000}")
     private long refreshTokenExpiration;
 
@@ -59,46 +59,46 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)
-            )
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)
+                )
                 .headers(headers -> headers
-                .cacheControl(cache -> cache.disable()))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/refresh", "/login/**", "/oauth2/**", "/error").permitAll()
-                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
-                .anyRequest().authenticated()
-            )
-
-            .exceptionHandling(exception -> exception
-                    .authenticationEntryPoint((request, response, authException) -> {
-                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                        response.setCharacterEncoding("UTF-8");
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-
-                        Map<String, Object> body = new HashMap<>();
-                        body.put("success", false);
-                        body.put("message", "인증되지 않은 사용자입니다.");
-                        body.put("error", "UNAUTHORIZED");
-
-                        objectMapper.writeValue(response.getWriter(), body);
-                    })
-            )
-
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .oauth2Login(oauth2 -> oauth2
-                .authorizationEndpoint(authorization -> authorization
-                    .authorizationRequestRepository(cookieAuthorizationRequestRepository())
-                    .baseUri("/oauth2/authorization")
+                        .cacheControl(cache -> cache.disable()))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/refresh", "/login/**", "/oauth2/**", "/error").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
+                        .anyRequest().authenticated()
                 )
-                .redirectionEndpoint(redirection -> redirection
-                    .baseUri("/login/oauth2/code/*")
+
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+                            Map<String, Object> body = new HashMap<>();
+                            body.put("success", false);
+                            body.put("message", "인증되지 않은 사용자입니다.");
+                            body.put("error", "UNAUTHORIZED");
+
+                            objectMapper.writeValue(response.getWriter(), body);
+                        })
                 )
-                .successHandler(oauth2LoginSuccessHandler())
-                .failureHandler(oauth2LoginFailureHandler())
-            );
+
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestRepository(cookieAuthorizationRequestRepository())
+                                .baseUri("/oauth2/authorization")
+                        )
+                        .redirectionEndpoint(redirection -> redirection
+                                .baseUri("/login/oauth2/code/*")
+                        )
+                        .successHandler(oauth2LoginSuccessHandler())
+                        .failureHandler(oauth2LoginFailureHandler())
+                );
 
 
         return http.build();
@@ -132,13 +132,13 @@ public class SecurityConfig {
                 }
             }
             AuthDto.LoginResponse loginResponse = authService.processKakaoLogin(oAuth2User, kakaoRefreshToken);
-            
+
             String accessToken = loginResponse.accessToken();
             String refreshToken = loginResponse.refreshToken();
 
             int accessTokenMaxAge = (int) (accessTokenExpiration / 1000);
             int refreshTokenMaxAge = (int) (refreshTokenExpiration / 1000);
-            
+
             addTokenCookie(response, "accessToken", accessToken, accessTokenMaxAge);
             addTokenCookie(response, "refreshToken", refreshToken, refreshTokenMaxAge);
 
@@ -162,21 +162,21 @@ public class SecurityConfig {
         return (request, response, exception) -> {
             String error = request.getParameter("error");
             String errorDescription = request.getParameter("error_description");
-            
+
             String redirectUri = getRedirectUriFromCookie(request);
-            
+
             if (redirectUri != null && !redirectUri.isBlank()) {
-                String redirectUrl = redirectUri + 
-                    "?success=false" +
-                    "&message=" + java.net.URLEncoder.encode("로그인에 실패했습니다.", java.nio.charset.StandardCharsets.UTF_8);
-                
+                String redirectUrl = redirectUri +
+                        "?success=false" +
+                        "&message=" + java.net.URLEncoder.encode("로그인에 실패했습니다.", java.nio.charset.StandardCharsets.UTF_8);
+
                 if (error != null) {
                     redirectUrl += "&error=" + java.net.URLEncoder.encode(error, java.nio.charset.StandardCharsets.UTF_8);
                 }
                 if (errorDescription != null) {
                     redirectUrl += "&errorDescription=" + java.net.URLEncoder.encode(errorDescription, java.nio.charset.StandardCharsets.UTF_8);
                 }
-                
+
                 try {
                     response.sendRedirect(redirectUrl);
                 } catch (java.io.IOException e) {
@@ -187,7 +187,7 @@ public class SecurityConfig {
             }
         };
     }
-    
+
     private String getRedirectUriFromCookie(HttpServletRequest request) {
         jakarta.servlet.http.Cookie[] cookies = request.getCookies();
         if (cookies != null) {
@@ -217,7 +217,7 @@ public class SecurityConfig {
 
         response.addHeader("Set-Cookie", cookie.toString());
     }
-    
+
     private void sendFailureJsonResponse(HttpServletResponse response, String error, String errorDescription) {
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("success", false);

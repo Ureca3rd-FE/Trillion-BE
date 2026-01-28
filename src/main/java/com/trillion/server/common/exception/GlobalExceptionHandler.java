@@ -3,6 +3,7 @@ package com.trillion.server.common.exception;
 import java.util.HashMap;
 import java.util.Map;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -18,7 +19,13 @@ import jakarta.persistence.EntityNotFoundException;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {
+    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(
+            IllegalArgumentException e,
+            HttpServletRequest request) {
+        // SSE 요청이면 null 반환
+        if (request.getRequestURI().contains("/sse/")) {
+            return null;
+        }
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", e.getMessage());
@@ -27,7 +34,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleEntityNotFoundException(EntityNotFoundException e) {
+    public ResponseEntity<Map<String, Object>> handleEntityNotFoundException(
+            EntityNotFoundException e,
+            HttpServletRequest request) {
+        if (request.getRequestURI().contains("/sse/")) {
+            return null;
+        }
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", e.getMessage());
@@ -36,7 +48,13 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException e) {
+    public ResponseEntity<Map<String, Object>> handleValidationException(
+            MethodArgumentNotValidException e,
+            HttpServletRequest request) {
+        if (request.getRequestURI().contains("/sse/")) {
+            return null;
+        }
+
         Map<String, Object> response = new HashMap<>();
         Map<String, String> errors = new HashMap<>();
         
@@ -54,7 +72,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception e) {
+    public ResponseEntity<Map<String, Object>> handleGenericException(
+            Exception e,
+            HttpServletRequest request) {
+        if (request.getRequestURI().contains("/sse/")) {
+            return null;
+        }
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", "서버 오류가 발생했습니다.");
@@ -63,7 +86,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException e) {
+    public ResponseEntity<Map<String, Object>> handleIllegalStateException(
+            IllegalStateException e,
+            HttpServletRequest request) {
+        if (request.getRequestURI().contains("/sse/")) {
+            return null;
+        }
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", e.getMessage());
@@ -71,4 +99,6 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.badRequest().body(response);
     }
+
+
 }
