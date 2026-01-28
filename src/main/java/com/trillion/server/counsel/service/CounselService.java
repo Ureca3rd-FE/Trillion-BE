@@ -50,6 +50,7 @@ public class CounselService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final RestTemplate restTemplate;
+    private final CounselSseEmitterService sseEmitterService;
 
     @Value("${ai.server.url}")
     private String aiServerUrl;
@@ -300,18 +301,29 @@ public class CounselService {
         log.info("CounselEntity 요약 JSON 업데이트 완료");
     }
 
-    private void updateStatusInTransaction(Long counselId, CounselStatus status, String json, CounselCategory category){
-        transactionTemplate.execute(action -> {
+    private record StatusChangedEvent(Long userId, Long counselId, CounselStatus status) {}
+
+    private void updateStatusInTransaction(Long counselId, CounselStatus nextStatus, String json, CounselCategory category) {
+        StatusChangedEvent event = transactionTemplate.execute(action -> {
             CounselEntity counsel = counselRepository.findById(counselId)
                     .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.COUNSEL_NOT_FOUND));
 
-            if(status == CounselStatus.COMPLETED) counsel.completeAnalysis(json, category);
+            if (nextStatus == CounselStatus.COMPLETED) counsel.completeAnalysis(json, category);
             else counsel.failAnalysis();
 
             counselRepository.save(counsel);
             counselRepository.flush();
-            return null;
+
+            return new StatusChangedEvent(
+                    counsel.getUser().getId(),
+                    counsel.getId(),
+                    counsel.getStatus()
+            );
         });
+
+        if (event != null) {
+            sseEmitterService.sendStatusChanged(event.userId(), event.counselId(), event.status());
+        }
     }
 
     private CounselCategory extractCategory(String jsonString) throws JsonProcessingException {
