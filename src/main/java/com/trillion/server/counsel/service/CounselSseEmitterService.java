@@ -1,4 +1,4 @@
-package com.trillion.server.counsel.sse;
+package com.trillion.server.counsel.service;
 
 import com.trillion.server.counsel.entity.CounselStatus;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +27,6 @@ public class CounselSseEmitterService {
         emitter.onTimeout(() -> remove(userId, emitter));
         emitter.onError(e -> remove(userId, emitter));
 
-        // (선택) 연결 직후 더미 이벤트 한번 쏘면 프록시/브라우저에서 연결 안정적일 때가 많음
         try {
             emitter.send(SseEmitter.event().name("CONNECTED").data("ok"));
         } catch (Exception e) {
